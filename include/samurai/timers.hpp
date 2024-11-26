@@ -294,6 +294,7 @@ namespace samurai
     {
 
         static Timers timers;
+        static Timers timers_b;
 
     }
 }
