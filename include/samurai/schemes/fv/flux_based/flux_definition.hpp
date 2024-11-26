@@ -73,11 +73,16 @@ namespace samurai
     struct NormalFluxDefinition<cfg, std::enable_if_t<cfg::scheme_type == SchemeType::NonLinear>> : NormalFluxDefinitionBase<cfg>
     {
         using field_t = typename cfg::input_field_t;
+        using cell_t  = typename field_t::cell_t;
 
-        using stencil_cells_t = StencilCells<cfg>;
+        using stencil_cells_t        = StencilCells<cfg>;
+        using stencil_cells_batch_t  = ArrayBatch<cell_t, cfg::stencil_size>;
+        using stencil_values_batch_t = ArrayBatch<typename field_t::value_type, cfg::stencil_size>;
+        using flux_values_batch_t    = Batch<FluxValue<cfg>>;
 
         using flux_func      = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
         using cons_flux_func = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
+        using cons_flux_func__batch = std::function<void(const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
 
         using jacobian_func      = std::function<StencilJacobianPair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
         using cons_jacobian_func = std::function<StencilJacobian<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
@@ -87,6 +92,12 @@ namespace samurai
          * @returns the flux in the positive direction.
          */
         cons_flux_func cons_flux_function = nullptr;
+
+        /**
+         * Conservative flux function:
+         * @returns the flux in the positive direction.
+         */
+        cons_flux_func__batch cons_flux_function__batch = nullptr;
 
         /**
          * Non-conservative flux function:

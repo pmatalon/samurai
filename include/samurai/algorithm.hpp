@@ -35,7 +35,8 @@ namespace samurai
     enum class Get
     {
         Cells,
-        Intervals
+        Intervals,
+        CellBatches
     };
 
     ///////////////////////////////////

@@ -443,15 +443,16 @@ namespace samurai
         return stencil_in_d;
     }
 
-    template <class Mesh, std::size_t stencil_size>
+    template <class Mesh, std::size_t stencil_size_>
     class IteratorStencil
     {
       public:
 
-        static constexpr std::size_t dim = Mesh::dim;
-        using mesh_interval_t            = typename Mesh::mesh_interval_t;
-        using coord_index_t              = typename Mesh::config::interval_t::coord_index_t;
-        using cell_t                     = Cell<dim, typename Mesh::interval_t>;
+        static constexpr std::size_t dim          = Mesh::dim;
+        static constexpr std::size_t stencil_size = stencil_size_;
+        using mesh_interval_t                     = typename Mesh::mesh_interval_t;
+        using coord_index_t                       = typename Mesh::config::interval_t::coord_index_t;
+        using cell_t                              = Cell<dim, typename Mesh::interval_t>;
 
       private:
 
@@ -582,12 +583,16 @@ namespace samurai
     template <std::size_t index_coarse_cell, class Mesh, std::size_t stencil_size>
     class LevelJumpIterator
     {
+      public:
+
         static constexpr std::size_t dim = Mesh::dim;
         using cell_t                     = Cell<dim, typename Mesh::interval_t>;
         using mesh_interval_t            = typename Mesh::mesh_interval_t;
 
         static constexpr std::size_t coarse = index_coarse_cell;
         static constexpr std::size_t fine   = (index_coarse_cell + 1) % 2;
+
+      private:
 
         std::size_t m_direction_index;
         IteratorStencil<Mesh, 1> m_coarse_it;
