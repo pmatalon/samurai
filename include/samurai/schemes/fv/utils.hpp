@@ -1,5 +1,6 @@
 #pragma once
 #include "algebraic_array.hpp"
+#include "batch.hpp"
 #include <xtensor/xfixed.hpp>
 
 namespace samurai
