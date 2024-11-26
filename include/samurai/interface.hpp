@@ -1,4 +1,5 @@
 #pragma once
+#include "arguments.hpp"
 #include "boundary.hpp"
 #include "stencil.hpp"
 
@@ -42,6 +43,7 @@ namespace samurai
         static constexpr std::size_t dim = Mesh::dim;
         using mesh_id_t                  = typename Mesh::mesh_id_t;
         using mesh_interval_t            = typename Mesh::mesh_interval_t;
+        using cell_t                     = typename Mesh::cell_t;
 
         Stencil<2, dim> interface_stencil_ = in_out_stencil<dim>(direction);
         auto interface_stencil             = make_stencil_analyzer(interface_stencil_);
@@ -60,9 +62,16 @@ namespace samurai
             comput_stencil_its.push_back(make_stencil_iterator(mesh, comput_stencil));
         }
 #else
-        auto interface_it            = make_stencil_iterator(mesh, interface_stencil);
-        auto comput_stencil_it       = make_stencil_iterator(mesh, comput_stencil);
+        auto interface_it      = make_stencil_iterator(mesh, interface_stencil);
+        auto comput_stencil_it = make_stencil_iterator(mesh, comput_stencil);
 #endif
+        ArrayBatch<cell_t, 2> interface_batch;
+        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        if constexpr (get_type == Get::CellBatches)
+        {
+            interface_batch.reserve(args::batch_size);
+            comput_stencil_batch.reserve(args::batch_size);
+        }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
             intersect,
@@ -99,6 +108,7 @@ namespace samurai
     {
         using mesh_id_t       = typename Mesh::mesh_id_t;
         using mesh_interval_t = typename Mesh::mesh_interval_t;
+        using cell_t          = typename Mesh::cell_t;
 
         if (level >= mesh.max_level())
         {
@@ -125,9 +135,16 @@ namespace samurai
             interface_its.emplace_back(comput_stencil_its[i], direction_index);
         }
 #else
-        auto comput_stencil_it       = make_stencil_iterator(mesh, comput_stencil);
-        auto interface_it            = make_leveljump_iterator<0>(comput_stencil_it, direction_index);
+        auto comput_stencil_it = make_stencil_iterator(mesh, comput_stencil);
+        auto interface_it      = make_leveljump_iterator<0>(comput_stencil_it, direction_index);
 #endif
+        ArrayBatch<cell_t, 2> interface_batch;
+        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        if constexpr (get_type == Get::CellBatches)
+        {
+            interface_batch.reserve(args::batch_size);
+            comput_stencil_batch.reserve(args::batch_size);
+        }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
             fine_intersect,
@@ -165,6 +182,7 @@ namespace samurai
         static constexpr std::size_t dim = Mesh::dim;
         using mesh_id_t                  = typename Mesh::mesh_id_t;
         using mesh_interval_t            = typename Mesh::mesh_interval_t;
+        using cell_t                     = typename Mesh::cell_t;
 
         if (level >= mesh.max_level())
         {
@@ -198,6 +216,13 @@ namespace samurai
         auto minus_comput_stencil_it = make_stencil_iterator(mesh, minus_comput_stencil);
         auto interface_it            = make_leveljump_iterator<1>(minus_comput_stencil_it, minus_direction_index);
 #endif
+        ArrayBatch<cell_t, 2> interface_batch;
+        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        if constexpr (get_type == Get::CellBatches)
+        {
+            interface_batch.reserve(args::batch_size);
+            comput_stencil_batch.reserve(args::batch_size);
+        }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
             fine_intersect,
@@ -348,8 +373,8 @@ namespace samurai
             comput_stencil_its.push_back(make_stencil_iterator(mesh, comput_stencil));
         }
 #else
-        auto interface_it            = make_stencil_iterator(mesh, interface_stencil);
-        auto comput_stencil_it       = make_stencil_iterator(mesh, comput_stencil);
+        auto interface_it      = make_stencil_iterator(mesh, interface_stencil);
+        auto comput_stencil_it = make_stencil_iterator(mesh, comput_stencil);
 #endif
 
         auto bdry = boundary(mesh, level, direction);

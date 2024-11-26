@@ -25,6 +25,8 @@ namespace samurai
         using typename base_class::mesh_id_t;
         using typename base_class::mesh_t;
 
+        using cell_t = typename mesh_t::cell_t;
+
         using cfg_t      = cfg;
         using bdry_cfg_t = bdry_cfg;
 
@@ -68,7 +70,14 @@ namespace samurai
             return (face_measure / cell_measure) * flux_value;
         }
 
-        inline field_value_type flux_value_cmpnent(const FluxValue<cfg>& flux_value, [[maybe_unused]] size_type field_i) const
+        auto h_factor(double h_face, double h_cell) const
+        {
+            double face_measure = std::pow(h_face, dim - 1);
+            double cell_measure = std::pow(h_cell, dim);
+            return face_measure / cell_measure;
+        }
+
+        inline field_value_type flux_value_cmpnent(const FluxValue<cfg>& flux_value, [[maybe_unused]] std::size_t field_i) const
         {
             if constexpr (output_field_size == 1)
             {
@@ -96,22 +105,48 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
+            constexpr Get get_type = Get::CellBatches;
+
             // Same level
             for (std::size_t level = min_level; level <= max_level; ++level)
             {
                 auto h = mesh.cell_length(level);
 
-                for_each_interior_interface__same_level<run_type>(mesh,
-                                                                  level,
-                                                                  flux_def.direction,
-                                                                  flux_def.stencil,
-                                                                  [&](auto& interface_cells, auto& comput_cells)
-                                                                  {
-                                                                      auto flux_values        = flux_function(comput_cells, field);
-                                                                      auto left_cell_contrib  = contribution(flux_values[0], h, h);
-                                                                      auto right_cell_contrib = contribution(flux_values[1], h, h);
-                                                                      apply_contrib(interface_cells, left_cell_contrib, right_cell_contrib);
-                                                                  });
+                for_each_interior_interface__same_level<run_type, get_type>(
+                    mesh,
+                    level,
+                    flux_def.direction,
+                    flux_def.stencil,
+                    [&](auto& interface_cells, auto& comput_cells)
+                    {
+                        if constexpr (get_type == Get::Cells)
+                        {
+                            auto flux_values        = flux_function(comput_cells, field);
+                            auto left_cell_contrib  = contribution(flux_values[0], h, h);
+                            auto right_cell_contrib = contribution(flux_values[1], h, h);
+                            // apply_contrib(interface_cells, left_cell_contrib, right_cell_contrib);
+                            apply_contrib(interface_cells[0], left_cell_contrib);
+                            apply_contrib(interface_cells[1], right_cell_contrib);
+                        }
+                        else if constexpr (get_type == Get::CellBatches)
+                        {
+                            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+                            transform(comput_cells,
+                                      stencil_values,
+                                      [&](const auto& cell)
+                                      {
+                                          return field[cell];
+                                      });
+
+                            Batch<FluxValue<cfg>> flux_values(interface_cells.size());
+                            flux_def.cons_flux_function__batch(comput_cells, flux_values, stencil_values);
+                            auto factor = h_factor(h, h);
+                            flux_values *= factor;
+                            apply_contrib(interface_cells[0], flux_values);
+                            flux_values *= -1;
+                            apply_contrib(interface_cells[1], flux_values);
+                        }
+                    });
             }
 
             // Level jumps (level -- level+1)
@@ -125,17 +160,41 @@ namespace samurai
                 //    --------->
                 //    direction
                 {
-                    for_each_interior_interface__level_jump_direction<run_type>(
+                    for_each_interior_interface__level_jump_direction<run_type, get_type>(
                         mesh,
                         level,
                         flux_def.direction,
                         flux_def.stencil,
                         [&](auto& interface_cells, auto& comput_cells)
                         {
-                            auto flux_values        = flux_function(comput_cells, field);
-                            auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_l);
-                            auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_lp1);
-                            apply_contrib(interface_cells, left_cell_contrib, right_cell_contrib);
+                            if constexpr (get_type == Get::Cells)
+                            {
+                                auto flux_values        = flux_function(comput_cells, field);
+                                auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_l);
+                                auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_lp1);
+                                // apply_contrib(interface_cells, left_cell_contrib, right_cell_contrib);
+                                apply_contrib(interface_cells[0], left_cell_contrib);
+                                apply_contrib(interface_cells[1], right_cell_contrib);
+                            }
+                            else if constexpr (get_type == Get::CellBatches)
+                            {
+                                ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+                                transform(comput_cells,
+                                          stencil_values,
+                                          [&](const auto& cell)
+                                          {
+                                              return field[cell];
+                                          });
+
+                                Batch<FluxValue<cfg>> flux_values(interface_cells.size());
+                                flux_def.cons_flux_function__batch(comput_cells, flux_values, stencil_values);
+                                auto left_factor = h_factor(h_lp1, h_l);
+                                flux_values *= left_factor;
+                                apply_contrib(interface_cells[0], flux_values);
+                                auto right_factor = h_factor(h_lp1, h_lp1);
+                                flux_values *= -1 / left_factor * right_factor; // cancel left factor and apply right one
+                                apply_contrib(interface_cells[1], flux_values);
+                            }
                         });
                 }
                 //    |__|        l+1
@@ -143,17 +202,41 @@ namespace samurai
                 //    --------->
                 //    direction
                 {
-                    for_each_interior_interface__level_jump_opposite_direction<run_type>(
+                    for_each_interior_interface__level_jump_opposite_direction<run_type, get_type>(
                         mesh,
                         level,
                         flux_def.direction,
                         flux_def.stencil,
                         [&](auto& interface_cells, auto& comput_cells)
                         {
-                            auto flux_values        = flux_function(comput_cells, field);
-                            auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_lp1);
-                            auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_l);
-                            apply_contrib(interface_cells, left_cell_contrib, right_cell_contrib);
+                            if constexpr (get_type == Get::Cells)
+                            {
+                                auto flux_values        = flux_function(comput_cells, field);
+                                auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_lp1);
+                                auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_l);
+                                // apply_contrib(interface_cells, left_cell_contrib, right_cell_contrib);
+                                apply_contrib(interface_cells[0], left_cell_contrib);
+                                apply_contrib(interface_cells[1], right_cell_contrib);
+                            }
+                            else if constexpr (get_type == Get::CellBatches)
+                            {
+                                ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+                                transform(comput_cells,
+                                          stencil_values,
+                                          [&](const auto& cell)
+                                          {
+                                              return field[cell];
+                                          });
+
+                                Batch<FluxValue<cfg>> flux_values(interface_cells.size());
+                                flux_def.cons_flux_function__batch(comput_cells, flux_values, stencil_values);
+                                auto left_factor = h_factor(h_lp1, h_lp1);
+                                flux_values *= left_factor;
+                                apply_contrib(interface_cells[0], flux_values);
+                                auto right_factor = h_factor(h_lp1, h_l);
+                                flux_values *= -1 / left_factor * right_factor; // cancel left factor and apply right one
+                                apply_contrib(interface_cells[1], flux_values);
+                            }
                         });
                 }
             }
