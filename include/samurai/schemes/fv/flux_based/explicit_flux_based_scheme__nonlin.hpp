@@ -32,37 +32,27 @@ namespace samurai
 
         void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const override
         {
+            constexpr Get get_type = Get::CellBatches;
+
             // Interior interfaces
-            scheme().template for_each_interior_interface<Run::Parallel>( // We need the 'template' keyword...
+            scheme().template for_each_interior_interface<Run::Parallel, get_type>( // We need the 'template' keyword...
                 d,
                 input_field,
-                // [&](const auto& left_cell, const auto& right_cell, auto& left_cell_contrib, auto& right_cell_contrib)
-                // {
-                //     for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
-                //     {
-                //     // clang-format off
-                //         #pragma omp atomic update
-                //         field_value(output_field, left_cell, field_i) += this->scheme().flux_value_cmpnent(left_cell_contrib, field_i);
-
-                //         #pragma omp atomic update
-                //         field_value(output_field, right_cell, field_i) += this->scheme().flux_value_cmpnent(right_cell_contrib, field_i);
-                //         // clang-format on
-                //     }
-                // });
                 [&](const auto& cell, auto& contrib)
                 {
-                    for (size_type field_i = 0; field_i < output_field_size; ++field_i)
+                    if constexpr (get_type == Get::Cells)
                     {
-                        if constexpr (std::is_same_v<std::decay_t<decltype(contrib)>, double>)
+                        for (size_type field_i = 0; field_i < output_field_size; ++field_i)
                         {
-                        // clang-format off
-                            #pragma omp atomic update
+#pragma omp atomic update
                             field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
-                            // clang-format on
                         }
-                        else
+                    }
+                    else if constexpr (get_type == Get::CellBatches)
+                    {
+                        for (std::size_t i = 0; i < cell.size(); ++i)
                         {
-                            for (std::size_t i = 0; i < cell.size(); ++i)
+                            for (size_type field_i = 0; field_i < output_field_size; ++field_i)
                             {
 #pragma omp atomic update
                                 field_value(output_field, cell[i], field_i) += this->scheme().flux_value_cmpnent(contrib[i], field_i);
