@@ -35,17 +35,38 @@ namespace samurai
             scheme().template for_each_interior_interface<Run::Parallel>( // We need the 'template' keyword...
                 d,
                 input_field,
-                [&](const auto& interface_cells, auto& left_cell_contrib, auto& right_cell_contrib)
+                // [&](const auto& left_cell, const auto& right_cell, auto& left_cell_contrib, auto& right_cell_contrib)
+                // {
+                //     for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
+                //     {
+                //     // clang-format off
+                //         #pragma omp atomic update
+                //         field_value(output_field, left_cell, field_i) += this->scheme().flux_value_cmpnent(left_cell_contrib, field_i);
+
+                //         #pragma omp atomic update
+                //         field_value(output_field, right_cell, field_i) += this->scheme().flux_value_cmpnent(right_cell_contrib, field_i);
+                //         // clang-format on
+                //     }
+                // });
+                [&](const auto& cell, auto& contrib)
                 {
                     for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
                     {
-                    // clang-format off
-                        #pragma omp atomic update
-                        field_value(output_field, interface_cells[0], field_i) += this->scheme().flux_value_cmpnent(left_cell_contrib, field_i);
-
-                        #pragma omp atomic update
-                        field_value(output_field, interface_cells[1], field_i) += this->scheme().flux_value_cmpnent(right_cell_contrib, field_i);
-                        // clang-format on
+                        if constexpr (std::is_same_v<std::decay_t<decltype(contrib)>, double>)
+                        {
+                        // clang-format off
+                            #pragma omp atomic update
+                            field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
+                            // clang-format on
+                        }
+                        else
+                        {
+                            for (std::size_t i = 0; i < cell.size(); ++i)
+                            {
+#pragma omp atomic update
+                                field_value(output_field, cell[i], field_i) += this->scheme().flux_value_cmpnent(contrib[i], field_i);
+                            }
+                        }
                     }
                 });
 

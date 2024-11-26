@@ -8,12 +8,14 @@ namespace samurai
 {
     namespace args
     {
-        static bool timers = false;
+        static bool timers            = false;
+        static std::size_t batch_size = 100;
     }
 
     inline void read_samurai_arguments(CLI::App& app, int& argc, char**& argv)
     {
         app.add_flag("--timers", args::timers, "Print timers at the end of the program")->capture_default_str()->group("Tools");
+        app.add_option("--batch-size", args::batch_size, "Batch size")->capture_default_str()->group("Tools");
         app.allow_extras();
         app.set_help_flag("", ""); // deactivate --help option
         try

@@ -117,6 +117,19 @@ namespace samurai
                         f *= velocity(d);
                         return compute_weno5_flux(f);
                     };
+
+                    weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/, auto& flux_values, auto& stencil_values)
+                    {
+                        ArrayBatch<FluxValue<cfg>, 5> f;
+                        f.resize(stencil_values.size());
+                        f[0] = velocity(d) * stencil_values[0];
+                        f[1] = velocity(d) * stencil_values[1];
+                        f[2] = velocity(d) * stencil_values[2];
+                        f[3] = velocity(d) * stencil_values[3];
+                        f[4] = velocity(d) * stencil_values[4];
+                        // f *= velocity(d);
+                        compute_weno5_flux__batch(flux_values, f);
+                    };
                 }
                 else
                 {
@@ -125,6 +138,19 @@ namespace samurai
                         Array<FluxValue<cfg>, 5> f({u[cells[5]], u[cells[4]], u[cells[3]], u[cells[2]], u[cells[1]]});
                         f *= velocity(d);
                         return compute_weno5_flux(f);
+                    };
+
+                    weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/, auto& flux_values, auto& stencil_values)
+                    {
+                        ArrayBatch<FluxValue<cfg>, 5> f;
+                        f.resize(stencil_values.size());
+                        f[0] = velocity(d) * stencil_values[5];
+                        f[1] = velocity(d) * stencil_values[4];
+                        f[2] = velocity(d) * stencil_values[3];
+                        f[3] = velocity(d) * stencil_values[2];
+                        f[4] = velocity(d) * stencil_values[1];
+                        // f *= velocity(d);
+                        compute_weno5_flux__batch(flux_values, f);
                     };
                 }
             });
