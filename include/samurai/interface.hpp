@@ -13,8 +13,10 @@ namespace samurai
                            ArrayBatch<typename interface_iterator_t::cell_t, stencil_iterator_t::stencil_size>& comput_stencil_batch,
                            Func&& f)
     {
+        times::timers_b.start("iterator interval init");
         comput_stencil_it.init(mesh_interval);
         interface_it.init(mesh_interval);
+        times::timers_b.stop("iterator interval init");
 
         if constexpr (get_type == Get::Intervals)
         {
@@ -34,6 +36,7 @@ namespace samurai
             std::size_t to_process = mesh_interval.i.size();
             while (to_process > 0)
             {
+                times::timers_b.start("make cell batch");
                 auto n = std::min(to_process, args::batch_size - interface_batch.size());
                 for (std::size_t ii = 0; ii < n; ++ii)
                 {
@@ -43,12 +46,15 @@ namespace samurai
                     comput_stencil_it.move_next();
                 }
                 to_process -= n;
+                times::timers_b.stop("make cell batch");
                 if (interface_batch.size() == args::batch_size)
                 {
                     f(interface_batch, comput_stencil_batch);
 
+                    times::timers_b.start("make cell batch");
                     interface_batch.clear();
                     comput_stencil_batch.clear();
+                    times::timers_b.stop("make cell batch");
                 }
             }
         }
@@ -105,45 +111,6 @@ namespace samurai
                                                              auto& interface_it      = interface_its[thread];
                                                              auto& comput_stencil_it = comput_stencil_its[thread];
 #endif
-                                                             //  interface_it.init(mesh_interval);
-                                                             //  comput_stencil_it.init(mesh_interval);
-
-                                                             //  if constexpr (get_type == Get::Intervals)
-                                                             //  {
-                                                             //      f(interface_it, comput_stencil_it);
-                                                             //  }
-                                                             //  else if constexpr (get_type == Get::Cells)
-                                                             //  {
-                                                             //      for (std::size_t ii = 0; ii < mesh_interval.i.size(); ++ii)
-                                                             //      {
-                                                             //          f(interface_it.cells(), comput_stencil_it.cells());
-                                                             //          interface_it.move_next();
-                                                             //          comput_stencil_it.move_next();
-                                                             //      }
-                                                             //  }
-                                                             //  else if constexpr (get_type == Get::CellBatches)
-                                                             //  {
-                                                             //      std::size_t to_process = mesh_interval.i.size();
-                                                             //      while (to_process > 0)
-                                                             //      {
-                                                             //          auto n = std::min(to_process, args::batch_size -
-                                                             //          interface_batch.size()); for (std::size_t ii = 0; ii < n; ++ii)
-                                                             //          {
-                                                             //              interface_batch.add(interface_it.cells());
-                                                             //              comput_stencil_batch.add(comput_stencil_it.cells());
-                                                             //              interface_it.move_next();
-                                                             //              comput_stencil_it.move_next();
-                                                             //          }
-                                                             //          to_process -= n;
-                                                             //          if (interface_batch.size() == args::batch_size)
-                                                             //          {
-                                                             //              f(interface_batch, comput_stencil_batch);
-
-                                                             //              interface_batch.clear();
-                                                             //              comput_stencil_batch.clear();
-                                                             //          }
-                                                             //      }
-                                                             //  }
                                                              apply_on_interval<get_type>(mesh_interval,
                                                                                          interface_it,
                                                                                          comput_stencil_it,
@@ -228,22 +195,6 @@ namespace samurai
                                                              auto& interface_it      = interface_its[thread];
                                                              auto& comput_stencil_it = comput_stencil_its[thread];
 #endif
-                                                             //  comput_stencil_it.init(fine_mesh_interval);
-                                                             //  interface_it.init(fine_mesh_interval);
-
-                                                             //  if constexpr (get_type == Get::Intervals)
-                                                             //  {
-                                                             //      f(interface_it, comput_stencil_it);
-                                                             //  }
-                                                             //  else if constexpr (get_type == Get::Cells)
-                                                             //  {
-                                                             //      for (std::size_t ii = 0; ii < fine_mesh_interval.i.size(); ++ii)
-                                                             //      {
-                                                             //          f(interface_it.cells(), comput_stencil_it.cells());
-                                                             //          interface_it.move_next();
-                                                             //          comput_stencil_it.move_next();
-                                                             //      }
-                                                             //  }
                                                              apply_on_interval<get_type>(fine_mesh_interval,
                                                                                          interface_it,
                                                                                          comput_stencil_it,
@@ -332,22 +283,6 @@ namespace samurai
                                                              auto& interface_it            = interface_its[thread];
                                                              auto& minus_comput_stencil_it = comput_stencil_its[thread];
 #endif
-                                                             //  minus_comput_stencil_it.init(fine_mesh_interval);
-                                                             //  interface_it.init(fine_mesh_interval);
-
-                                                             //  if constexpr (get_type == Get::Intervals)
-                                                             //  {
-                                                             //      f(interface_it, minus_comput_stencil_it);
-                                                             //  }
-                                                             //  else if constexpr (get_type == Get::Cells)
-                                                             //  {
-                                                             //      for (std::size_t ii = 0; ii < fine_mesh_interval.i.size(); ++ii)
-                                                             //      {
-                                                             //          f(interface_it.cells(), minus_comput_stencil_it.cells());
-                                                             //          interface_it.move_next();
-                                                             //          minus_comput_stencil_it.move_next();
-                                                             //      }
-                                                             //  }
                                                              apply_on_interval<get_type>(fine_mesh_interval,
                                                                                          interface_it,
                                                                                          minus_comput_stencil_it,
