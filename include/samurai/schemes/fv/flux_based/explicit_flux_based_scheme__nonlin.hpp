@@ -33,6 +33,8 @@ namespace samurai
         {
             constexpr Get get_type = Get::CellBatches;
 
+            times::timers_interfaces.start("interior");
+
             // Interior interfaces
             scheme().template for_each_interior_interface<Run::Parallel, get_type>( // We need the 'template' keyword...
                 d,
@@ -60,6 +62,10 @@ namespace samurai
                     }
                 });
 
+            times::timers_interfaces.stop("interior");
+
+            times::timers_interfaces.start("boundary");
+
             // Boundary interfaces
             if (scheme().include_boundary_fluxes())
             {
@@ -74,6 +80,7 @@ namespace samurai
                         }
                     });
             }
+            times::timers_interfaces.stop("boundary");
         }
     };
 } // end namespace samurai
