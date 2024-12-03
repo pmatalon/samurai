@@ -11,10 +11,17 @@ namespace samurai
                                   stencil_iterator_t& comput_stencil_it,
                                   Func&& f)
     {
-        times::timers_b.start("iterator interval init");
+        // times::timers_b.start("iterator interval init");
         comput_stencil_it.init(mesh_interval);
         interface_it.init(mesh_interval);
-        times::timers_b.stop("iterator interval init");
+        // times::timers_b.stop("iterator interval init");
+
+        using cell_t          = typename interface_iterator_t::cell_t;
+        auto simple_cell_copy = [](cell_t& dest, const cell_t& src)
+        {
+            dest.index   = src.index;
+            dest.indices = src.indices;
+        };
 
         if constexpr (get_type == Get::Intervals)
         {
@@ -71,8 +78,8 @@ namespace samurai
         ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.reserve(args::batch_size);
-            comput_stencil_batch.reserve(args::batch_size);
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
@@ -144,8 +151,8 @@ namespace samurai
         ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.reserve(args::batch_size);
-            comput_stencil_batch.reserve(args::batch_size);
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
@@ -222,8 +229,8 @@ namespace samurai
         ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.reserve(args::batch_size);
-            comput_stencil_batch.reserve(args::batch_size);
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
