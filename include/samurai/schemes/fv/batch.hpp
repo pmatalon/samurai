@@ -13,8 +13,11 @@ namespace samurai
       private:
 
         using dynamic_vector_t = StdVectorWrapper<T>;
+        // using dynamic_vector_t = xt::xtensor<T, 1>;
 
         std::array<dynamic_vector_t, array_size> m_batch;
+
+        std::size_t m_add_counter = 0;
 
       public:
 
@@ -40,6 +43,17 @@ namespace samurai
         inline std::size_t size() const
         {
             return m_batch[0].size();
+            // return m_size;
+        }
+
+        inline auto add_counter() const
+        {
+            return m_add_counter;
+        }
+
+        inline void reset_add_counter()
+        {
+            m_add_counter = 0;
         }
 
         inline auto& operator[](std::size_t index_in_array)
@@ -52,20 +66,27 @@ namespace samurai
             return m_batch[index_in_array];
         }
 
-        inline void reserve(std::size_t batch_size)
-        {
-            if constexpr (array_size == 1)
-            {
-                m_batch.reserve(batch_size);
-            }
-            else
-            {
-                for (std::size_t i = 0; i < array_size; ++i)
-                {
-                    m_batch[i].reserve(batch_size);
-                }
-            }
-        }
+        // inline void reserve(std::size_t batch_size)
+        // {
+        //     if constexpr (array_size == 1)
+        //     {
+        //         m_batch.reserve(batch_size);
+        //     }
+        //     else
+        //     {
+        //         for (std::size_t i = 0; i < array_size; ++i)
+        //         {
+        //             if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
+        //             {
+        //                 m_batch[i].data().reserve(batch_size);
+        //             }
+        //             else
+        //             {
+        //                 m_batch[i].reserve(batch_size);
+        //             }
+        //         }
+        //     }
+        // }
 
         inline void resize(std::size_t batch_size)
         {
@@ -77,7 +98,14 @@ namespace samurai
             {
                 for (std::size_t i = 0; i < array_size; ++i)
                 {
-                    m_batch[i].resize(batch_size);
+                    if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
+                    {
+                        m_batch[i].resize({batch_size});
+                    }
+                    else
+                    {
+                        m_batch[i].resize(batch_size);
+                    }
                 }
             }
         }
@@ -87,125 +115,50 @@ namespace samurai
         {
             if constexpr (array_size == 1)
             {
-                m_batch.push_back(values);
+                m_batch[m_add_counter].values;
             }
             else
             {
                 for (std::size_t i = 0; i < array_size; ++i)
                 {
-                    m_batch[i].push_back(values[i]);
+                    m_batch[i][m_add_counter] = values[i];
                 }
             }
+            m_add_counter++;
         }
 
-        inline void clear()
+        template <class Func>
+        inline void add(const std::array<T, array_size>& values, Func&& copy)
         {
             if constexpr (array_size == 1)
             {
-                m_batch.clear();
+                m_batch[m_add_counter].values;
             }
             else
             {
                 for (std::size_t i = 0; i < array_size; ++i)
                 {
-                    m_batch[i].clear();
+                    copy(m_batch[i][m_add_counter], values[i]);
                 }
             }
+            m_add_counter++;
         }
 
-        inline bool empty() const
-        {
-            if constexpr (array_size == 1)
-            {
-                return m_batch[0].empty();
-            }
-            else
-            {
-                return m_batch[0].empty();
-            }
-        }
+        // inline bool empty() const
+        // {
+        //     if constexpr (array_size == 1)
+        //     {
+        //         return m_batch[0].empty();
+        //     }
+        //     else
+        //     {
+        //         return m_batch[0].empty();
+        //     }
+        // }
     };
 
     template <class T>
     using Batch = StdVectorWrapper<T>;
-
-    // template <class T>
-    // class ArrayBatch<T, 1>
-
-    // template <class T>
-    // class Batch
-    // {
-    //   public:
-
-    //     using value_type = T;
-
-    //   private:
-
-    //     using dynamic_vector_t = StdVectorWrapper<T>;
-
-    //     dynamic_vector_t m_batch;
-
-    //   public:
-
-    //     Batch()
-    //     {
-    //     }
-
-    //     Batch(std::size_t batch_size)
-    //     {
-    //         resize(batch_size);
-    //     }
-
-    //     inline auto& batch()
-    //     {
-    //         return m_batch;
-    //     }
-
-    //     inline const auto& batch() const
-    //     {
-    //         return m_batch;
-    //     }
-
-    //     inline std::size_t size() const
-    //     {
-    //         return m_batch.size();
-    //     }
-
-    //     inline void reserve(std::size_t batch_size)
-    //     {
-    //         m_batch.reserve(batch_size);
-    //     }
-
-    //     inline void resize(std::size_t batch_size)
-    //     {
-    //         m_batch.resize(batch_size);
-    //     }
-
-    //     inline void add(const T& value)
-    //     {
-    //         m_batch.push_back(value);
-    //     }
-
-    //     inline void clear()
-    //     {
-    //         if constexpr (array_size == 1)
-    //         {
-    //             m_batch.clear();
-    //         }
-    //         else
-    //         {
-    //             for (std::size_t i = 0; i < array_size; ++i)
-    //             {
-    //                 m_batch[i].clear();
-    //             }
-    //         }
-    //     }
-
-    //     inline bool empty() const
-    //     {
-    //         return m_batch.empty();
-    //     }
-    // };
 
     template <class T1, class T2, std::size_t size, class Func>
     void transform(const ArrayBatch<T1, size>& input, ArrayBatch<T2, size>& output, Func&& op)

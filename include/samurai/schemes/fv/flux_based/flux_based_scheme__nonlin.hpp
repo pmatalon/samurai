@@ -41,7 +41,7 @@ namespace samurai
         {
         }
 
-        auto& flux_definition() const
+        const auto& flux_definition() const
         {
             return m_flux_definition;
         }
@@ -104,6 +104,7 @@ namespace samurai
 
             ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values(args::batch_size);
             Batch<FluxValue<cfg>> flux_values(args::batch_size);
+            auto context = flux_def.create_context();
 
             // Same level
             for (std::size_t level = min_level; level <= max_level; ++level)
@@ -119,18 +120,19 @@ namespace samurai
                     {
                         if constexpr (get_type == Get::Cells)
                         {
-                            times::timers_b.start("computation");
+                            // times::timers_b.start("computation");
                             auto flux_values        = flux_function(comput_cells, field);
                             auto left_cell_contrib  = contribution(flux_values[0], h, h);
                             auto right_cell_contrib = contribution(flux_values[1], h, h);
-                            times::timers_b.stop("computation");
-                            times::timers_b.start("copy to field");
+                            // times::timers_b.stop("computation");
+                            // times::timers_b.start("copy to field");
                             apply_contrib(interface_cells[0], left_cell_contrib);
                             apply_contrib(interface_cells[1], right_cell_contrib);
-                            times::timers_b.stop("copy to field");
+                            // times::timers_b.stop("copy to field");
                         }
                         else if constexpr (get_type == Get::CellBatches)
                         {
+                            flux_values.resize(interface_cells.size());
                             times::timers_b.start("transform");
                             transform(comput_cells,
                                       stencil_values,
@@ -141,7 +143,7 @@ namespace samurai
                             times::timers_b.stop("transform");
 
                             times::timers_b.start("computation");
-                            flux_def.cons_flux_function__batch(comput_cells, flux_values, stencil_values);
+                            flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
                             auto factor = h_factor(h, h);
                             flux_values *= factor;
                             times::timers_b.stop("computation");
@@ -154,9 +156,6 @@ namespace samurai
                             times::timers_b.start("copy to field");
                             apply_contrib(interface_cells[1], flux_values);
                             times::timers_b.stop("copy to field");
-
-                            stencil_values.clear();
-                            flux_values.clear();
                         }
                     });
             }
@@ -181,45 +180,43 @@ namespace samurai
                         {
                             if constexpr (get_type == Get::Cells)
                             {
-                                times::timers_b.start("computation");
+                                // times::timers_b.start("computation");
                                 auto flux_values        = flux_function(comput_cells, field);
                                 auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_l);
                                 auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_lp1);
-                                times::timers_b.stop("computation");
-                                times::timers_b.start("copy to field");
+                                // times::timers_b.stop("computation");
+                                // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[0], left_cell_contrib);
                                 apply_contrib(interface_cells[1], right_cell_contrib);
-                                times::timers_b.stop("copy to field");
+                                // times::timers_b.stop("copy to field");
                             }
                             else if constexpr (get_type == Get::CellBatches)
                             {
-                                times::timers_b.start("transform");
+                                flux_values.resize(interface_cells.size());
+                                // times::timers_b.start("transform");
                                 transform(comput_cells,
                                           stencil_values,
                                           [&](const auto& cell)
                                           {
                                               return field[cell];
                                           });
-                                times::timers_b.stop("transform");
+                                // times::timers_b.stop("transform");
 
-                                times::timers_b.start("computation");
-                                flux_def.cons_flux_function__batch(comput_cells, flux_values, stencil_values);
+                                // times::timers_b.start("computation");
+                                flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
                                 auto left_factor = h_factor(h_lp1, h_l);
                                 flux_values *= left_factor;
-                                times::timers_b.stop("computation");
-                                times::timers_b.start("copy to field");
+                                // times::timers_b.stop("computation");
+                                // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[0], flux_values);
-                                times::timers_b.stop("copy to field");
-                                times::timers_b.start("computation");
+                                // times::timers_b.stop("copy to field");
+                                // times::timers_b.start("computation");
                                 auto right_factor = h_factor(h_lp1, h_lp1);
                                 flux_values *= -1 / left_factor * right_factor; // cancel left factor and apply right one
-                                times::timers_b.stop("computation");
-                                times::timers_b.start("copy to field");
+                                // times::timers_b.stop("computation");
+                                // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[1], flux_values);
-                                times::timers_b.stop("copy to field");
-
-                                stencil_values.clear();
-                                flux_values.clear();
+                                // times::timers_b.stop("copy to field");
                             }
                         });
                 }
@@ -237,45 +234,43 @@ namespace samurai
                         {
                             if constexpr (get_type == Get::Cells)
                             {
-                                times::timers_b.start("computation");
+                                // times::timers_b.start("computation");
                                 auto flux_values        = flux_function(comput_cells, field);
                                 auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_lp1);
                                 auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_l);
-                                times::timers_b.stop("computation");
-                                times::timers_b.start("copy to field");
+                                // times::timers_b.stop("computation");
+                                // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[0], left_cell_contrib);
                                 apply_contrib(interface_cells[1], right_cell_contrib);
-                                times::timers_b.stop("copy to field");
+                                // times::timers_b.stop("copy to field");
                             }
                             else if constexpr (get_type == Get::CellBatches)
                             {
-                                times::timers_b.start("transform");
+                                flux_values.resize(interface_cells.size());
+                                // times::timers_b.start("transform");
                                 transform(comput_cells,
                                           stencil_values,
                                           [&](const auto& cell)
                                           {
                                               return field[cell];
                                           });
-                                times::timers_b.stop("transform");
+                                // times::timers_b.stop("transform");
 
-                                times::timers_b.start("computation");
-                                flux_def.cons_flux_function__batch(comput_cells, flux_values, stencil_values);
+                                // times::timers_b.start("computation");
+                                flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
                                 auto left_factor = h_factor(h_lp1, h_lp1);
                                 flux_values *= left_factor;
-                                times::timers_b.stop("computation");
-                                times::timers_b.start("copy to field");
+                                // times::timers_b.stop("computation");
+                                // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[0], flux_values);
-                                times::timers_b.stop("copy to field");
-                                times::timers_b.start("computation");
+                                // times::timers_b.stop("copy to field");
+                                // times::timers_b.start("computation");
                                 auto right_factor = h_factor(h_lp1, h_l);
                                 flux_values *= -1 / left_factor * right_factor; // cancel left factor and apply right one
-                                times::timers_b.start("computation");
-                                times::timers_b.start("copy to field");
+                                // times::timers_b.start("computation");
+                                // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[1], flux_values);
-                                times::timers_b.stop("copy to field");
-
-                                stencil_values.clear();
-                                flux_values.clear();
+                                // times::timers_b.stop("copy to field");
                             }
                         });
                 }

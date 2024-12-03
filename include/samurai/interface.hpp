@@ -13,10 +13,17 @@ namespace samurai
                            ArrayBatch<typename interface_iterator_t::cell_t, stencil_iterator_t::stencil_size>& comput_stencil_batch,
                            Func&& f)
     {
-        times::timers_b.start("iterator interval init");
+        // times::timers_b.start("iterator interval init");
         comput_stencil_it.init(mesh_interval);
         interface_it.init(mesh_interval);
-        times::timers_b.stop("iterator interval init");
+        // times::timers_b.stop("iterator interval init");
+
+        using cell_t          = typename interface_iterator_t::cell_t;
+        auto simple_cell_copy = [](cell_t& dest, const cell_t& src)
+        {
+            dest.index   = src.index;
+            dest.indices = src.indices;
+        };
 
         if constexpr (get_type == Get::Intervals)
         {
@@ -36,25 +43,25 @@ namespace samurai
             std::size_t to_process = mesh_interval.i.size();
             while (to_process > 0)
             {
-                times::timers_b.start("make cell batch");
-                auto n = std::min(to_process, args::batch_size - interface_batch.size());
+                // times::timers_b.start("make cell batch");
+                auto n = std::min(to_process, args::batch_size - interface_batch.add_counter());
                 for (std::size_t ii = 0; ii < n; ++ii)
                 {
-                    interface_batch.add(interface_it.cells());
-                    comput_stencil_batch.add(comput_stencil_it.cells());
+                    interface_batch.add(interface_it.cells(), simple_cell_copy);
+                    comput_stencil_batch.add(comput_stencil_it.cells(), simple_cell_copy);
                     interface_it.move_next();
                     comput_stencil_it.move_next();
                 }
                 to_process -= n;
-                times::timers_b.stop("make cell batch");
-                if (interface_batch.size() == args::batch_size)
+                // times::timers_b.stop("make cell batch");
+                if (interface_batch.add_counter() == args::batch_size)
                 {
                     f(interface_batch, comput_stencil_batch);
 
-                    times::timers_b.start("make cell batch");
-                    interface_batch.clear();
-                    comput_stencil_batch.clear();
-                    times::timers_b.stop("make cell batch");
+                    // times::timers_b.start("make cell batch");
+                    interface_batch.reset_add_counter();
+                    comput_stencil_batch.reset_add_counter();
+                    // times::timers_b.stop("make cell batch");
                 }
             }
         }
@@ -99,8 +106,8 @@ namespace samurai
         ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.reserve(args::batch_size);
-            comput_stencil_batch.reserve(args::batch_size);
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(intersect,
@@ -120,8 +127,10 @@ namespace samurai
                                                          });
         if constexpr (get_type == Get::CellBatches)
         {
-            if (!interface_batch.empty())
+            if (interface_batch.add_counter() > 0)
             {
+                interface_batch.resize(interface_batch.add_counter());
+                comput_stencil_batch.resize(interface_batch.add_counter());
                 f(interface_batch, comput_stencil_batch);
             }
         }
@@ -183,8 +192,8 @@ namespace samurai
         ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.reserve(args::batch_size);
-            comput_stencil_batch.reserve(args::batch_size);
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(fine_intersect,
@@ -204,8 +213,10 @@ namespace samurai
                                                          });
         if constexpr (get_type == Get::CellBatches)
         {
-            if (!interface_batch.empty())
+            if (interface_batch.add_counter() > 0)
             {
+                interface_batch.resize(interface_batch.add_counter());
+                comput_stencil_batch.resize(interface_batch.add_counter());
                 f(interface_batch, comput_stencil_batch);
             }
         }
@@ -271,8 +282,8 @@ namespace samurai
         ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.reserve(args::batch_size);
-            comput_stencil_batch.reserve(args::batch_size);
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(fine_intersect,
@@ -292,11 +303,20 @@ namespace samurai
                                                          });
         if constexpr (get_type == Get::CellBatches)
         {
-            if (!interface_batch.empty())
+            if (interface_batch.add_counter() > 0)
             {
+                interface_batch.resize(interface_batch.add_counter());
+                comput_stencil_batch.resize(interface_batch.add_counter());
                 f(interface_batch, comput_stencil_batch);
             }
         }
+        // DirectionVector<Mesh::dim> opposite_direction    = -direction;
+        // decltype(comput_stencil) opposite_comput_stencil = comput_stencil - direction;
+        // for_each_interior_interface__level_jump_direction<run_type, get_type>(mesh,
+        //                                                                       level,
+        //                                                                       opposite_direction,
+        //                                                                       opposite_comput_stencil,
+        //                                                                       std::forward<Func>(f));
     }
 
     /**

@@ -58,6 +58,9 @@ namespace samurai
 
             std::cout << std::endl;
             times::timers_b.print();
+
+            std::cout << std::endl;
+            times::timers_interfaces.print();
         }
 #ifdef SAMURAI_WITH_MPI
         MPI_Finalize();
