@@ -65,6 +65,9 @@ namespace samurai
     template <class cfg>
     using StencilJacobianPair = StdArrayWrapper<StencilJacobian<cfg>, 2>;
 
+    template <class cfg>
+    using StencilValuesBatch = ArrayBatch<typename cfg::input_field_t::value_type, cfg::stencil_size>;
+
     /**
      * Specialization of @class NormalFluxDefinition.
      * Defines how to compute a NON-LINEAR normal flux.
@@ -77,12 +80,16 @@ namespace samurai
 
         using stencil_cells_t        = StencilCells<cfg>;
         using stencil_cells_batch_t  = ArrayBatch<cell_t, cfg::stencil_size>;
-        using stencil_values_batch_t = ArrayBatch<typename field_t::value_type, cfg::stencil_size>;
+        using stencil_values_batch_t = StencilValuesBatch<cfg>; // ArrayBatch<typename field_t::value_type, cfg::stencil_size>;
         using flux_values_batch_t    = Batch<FluxValue<cfg>>;
 
-        using flux_func      = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
-        using cons_flux_func = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
-        using cons_flux_func__batch = std::function<void(const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
+        using context_t = StencilValuesBatch<cfg>;
+
+        using flux_func             = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
+        using cons_flux_func        = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
+        using cons_flux_func__batch = std::function<
+            void(const stencil_cells_batch_t&, flux_values_batch_t&, context_t&, stencil_values_batch_t&)>; // conservative
+        using create_context_func = std::function<context_t()>;
 
         using jacobian_func      = std::function<StencilJacobianPair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
         using cons_jacobian_func = std::function<StencilJacobian<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
@@ -98,6 +105,7 @@ namespace samurai
          * @returns the flux in the positive direction.
          */
         cons_flux_func__batch cons_flux_function__batch = nullptr;
+        create_context_func create_context              = nullptr;
 
         /**
          * Non-conservative flux function:

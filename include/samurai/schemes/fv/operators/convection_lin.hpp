@@ -103,12 +103,17 @@ namespace samurai
         static_for<0, dim>::apply( // for each positive Cartesian direction 'd'
             [&](auto integral_constant_d)
             {
-                static constexpr std::size_t d = decltype(integral_constant_d)::value;
+                static constexpr std::size_t d = integral_constant_d();
 
                 // Stencil creation:
                 //        weno5[0].stencil = {{-2, 0}, {-1, 0}, {0,0}, {1,0}, {2,0}, {3,0}};
                 //        weno5[1].stencil = {{ 0,-2}, { 0,-1}, {0,0}, {0,1}, {0,2}, {0,3}};
                 weno5[d].stencil = line_stencil<dim, d>(-2, -1, 0, 1, 2, 3);
+
+                weno5[d].create_context = []()
+                {
+                    return StencilValuesBatch<cfg>();
+                };
 
                 if (velocity(d) >= 0)
                 {
@@ -119,16 +124,18 @@ namespace samurai
                         return compute_weno5_flux(f);
                     };
 
-                    weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/, auto& flux_values, auto& stencil_values)
+                    weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/,
+                                                                     auto& flux_values,
+                                                                     StencilValuesBatch<cfg>& ctx,
+                                                                     const StencilValuesBatch<cfg>& stencil_values)
                     {
-                        ArrayBatch<FluxValue<cfg>, 5> f;
+                        auto& f = ctx;
                         f.resize(stencil_values.size());
                         f[0] = velocity(d) * stencil_values[0];
                         f[1] = velocity(d) * stencil_values[1];
                         f[2] = velocity(d) * stencil_values[2];
                         f[3] = velocity(d) * stencil_values[3];
                         f[4] = velocity(d) * stencil_values[4];
-                        // f *= velocity(d);
                         compute_weno5_flux__batch(flux_values, f);
                     };
                 }
@@ -141,16 +148,18 @@ namespace samurai
                         return compute_weno5_flux(f);
                     };
 
-                    weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/, auto& flux_values, auto& stencil_values)
+                    weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/,
+                                                                     auto& flux_values,
+                                                                     StencilValuesBatch<cfg>& ctx,
+                                                                     const StencilValuesBatch<cfg>& stencil_values)
                     {
-                        ArrayBatch<FluxValue<cfg>, 5> f;
+                        auto& f = ctx;
                         f.resize(stencil_values.size());
                         f[0] = velocity(d) * stencil_values[5];
                         f[1] = velocity(d) * stencil_values[4];
                         f[2] = velocity(d) * stencil_values[3];
                         f[3] = velocity(d) * stencil_values[2];
                         f[4] = velocity(d) * stencil_values[1];
-                        // f *= velocity(d);
                         compute_weno5_flux__batch(flux_values, f);
                     };
                 }

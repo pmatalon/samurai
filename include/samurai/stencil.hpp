@@ -471,9 +471,12 @@ namespace samurai
             int origin_index = find_stencil_origin(stencil);
             assert(origin_index >= 0 && "the zero vector is required in the stencil definition.");
             m_origin_cell = static_cast<unsigned int>(origin_index);
+            auto length   = mesh.cell_length(mesh.min_level());
             for (cell_t& cell : m_cells)
             {
                 cell.origin_point = mesh.origin_point();
+                cell.level        = mesh.min_level();
+                cell.length       = length;
             }
         }
 
@@ -481,11 +484,14 @@ namespace samurai
         {
             m_mesh_interval = &mesh_interval;
 
-            double length = m_mesh.cell_length(mesh_interval.level);
-            for (cell_t& cell : m_cells)
+            if (mesh_interval.level != m_cells[0].level)
             {
-                cell.level  = mesh_interval.level;
-                cell.length = length;
+                double length = m_mesh.cell_length(mesh_interval.level);
+                for (cell_t& cell : m_cells)
+                {
+                    cell.level  = mesh_interval.level;
+                    cell.length = length;
+                }
             }
 
             // origin of the stencil
@@ -496,11 +502,13 @@ namespace samurai
                 origin_cell.indices[d + 1] = mesh_interval.index[d];
             }
             origin_cell.index = get_index_start(m_mesh, mesh_interval);
-            if (origin_cell.index > 0 && static_cast<std::size_t>(origin_cell.index) > m_mesh.nb_cells())
+#ifndef NDEBUG
+            if (origin_cell.index > 0 && static_cast<std::size_t>(origin_cell.index) > m_mesh.nb_cells()) // nb_cells() is very costly
             {
                 std::cout << "Cell not found in the mesh: " << origin_cell << std::endl;
                 assert(false);
             }
+#endif
 
             for (unsigned int id = 0; id < stencil_size; ++id)
             {
@@ -536,11 +544,13 @@ namespace samurai
                 else
                 {
                     cell.index = get_index_start_translated(m_mesh, mesh_interval, d);
-                    if (cell.index > 0 && static_cast<std::size_t>(cell.index) > m_mesh.nb_cells())
+#ifndef NDEBUG
+                    if (cell.index > 0 && static_cast<std::size_t>(cell.index) > m_mesh.nb_cells()) // nb_cells() is very costly
                     {
                         std::cout << "Non-existing neighbour for " << origin_cell << " in the direction " << d << std::endl;
                         assert(false);
                     }
+#endif
                 }
             }
         }
@@ -564,8 +574,8 @@ namespace samurai
         {
             for (cell_t& cell : m_cells)
             {
-                cell.index++;      // increment cell index
-                cell.indices[0]++; // increment x-coordinate
+                ++cell.index;      // increment cell index
+                ++cell.indices[0]; // increment x-coordinate
             }
         }
 
@@ -598,7 +608,7 @@ namespace samurai
         IteratorStencil<Mesh, 1> m_coarse_it;
         const IteratorStencil<Mesh, stencil_size>* m_fine_it = nullptr;
         std::array<cell_t, 2> m_cells;
-        std::size_t m_ii = 0;
+        bool m_move_coarse_cell = false;
 
       public:
 
@@ -618,7 +628,7 @@ namespace samurai
             m_cells[coarse] = m_coarse_it.cells()[0];
             m_cells[fine]   = m_fine_it->cells()[m_direction_index];
 
-            m_ii = 0;
+            m_move_coarse_cell = false;
         }
 
         inline auto& interval() const
@@ -629,13 +639,13 @@ namespace samurai
         inline void move_next()
         {
             // Move fine cell
-            m_cells[fine].index++;      // increment cell index
-            m_cells[fine].indices[0]++; // increment x-coordinate
+            ++m_cells[fine].index;      // increment cell index
+            ++m_cells[fine].indices[0]; // increment x-coordinate
 
             // Move coarse cell only once every two iterations
-            m_cells[coarse].index += (m_ii % 2 == 1) ? 1 : 0;
-            m_cells[coarse].indices[0] += (m_ii % 2 == 1) ? 1 : 0;
-            m_ii++;
+            m_cells[coarse].index += static_cast<std::size_t>(m_move_coarse_cell);
+            m_cells[coarse].indices[0] += static_cast<std::size_t>(m_move_coarse_cell);
+            m_move_coarse_cell = !m_move_coarse_cell;
         }
 
         inline const auto& cells() const

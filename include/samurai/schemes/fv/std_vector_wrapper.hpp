@@ -38,12 +38,6 @@ namespace samurai
         StdVectorWrapper(std::initializer_list<T2> list)
             : _a(list)
         {
-            // auto it = list.begin();
-            // for (std::size_t i = 0; i < size(); ++i)
-            // {
-            //     _a[i] = *it;
-            //     it++;
-            // }
         }
 
         template <class... T2>
@@ -149,7 +143,7 @@ namespace samurai
             {
                 throw std::invalid_argument("Vector sizes do not match for addition.");
             }
-
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] += other._a[i];
@@ -163,6 +157,7 @@ namespace samurai
             {
                 throw std::invalid_argument("Vector sizes do not match for addition.");
             }
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] *= other._a[i];
@@ -176,6 +171,7 @@ namespace samurai
             {
                 throw std::invalid_argument("Vector sizes do not match for addition.");
             }
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] -= other._a[i];
@@ -189,6 +185,7 @@ namespace samurai
             {
                 throw std::invalid_argument("Vector sizes do not match for addition.");
             }
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] /= other._a[i];
@@ -199,6 +196,7 @@ namespace samurai
         template <class NumberType, typename std::enable_if_t<std::is_arithmetic_v<NumberType>, bool> = true>
         auto& operator+=(NumberType scalar)
         {
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] += scalar;
@@ -209,6 +207,7 @@ namespace samurai
         template <class NumberType, typename std::enable_if_t<std::is_arithmetic_v<NumberType>, bool> = true>
         auto& operator*=(NumberType scalar)
         {
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] *= scalar;
@@ -219,6 +218,7 @@ namespace samurai
         template <class NumberType, typename std::enable_if_t<std::is_arithmetic_v<NumberType>, bool> = true>
         auto& operator-=(NumberType scalar)
         {
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] -= scalar;
@@ -229,6 +229,7 @@ namespace samurai
         template <class NumberType, typename std::enable_if_t<std::is_arithmetic_v<NumberType>, bool> = true>
         auto& operator/=(NumberType scalar)
         {
+#pragma omp simd
             for (std::size_t i = 0; i < size(); ++i)
             {
                 _a[i] /= scalar;
@@ -275,6 +276,17 @@ namespace samurai
     {
         StdVectorWrapper<T> b(a);
         b /= scalar;
+        return b;
+    }
+
+    template <class T, class NumberType>
+    auto operator/(NumberType scalar, const StdVectorWrapper<T>& a)
+    {
+        StdVectorWrapper<T> b(a.size());
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            b[i] = scalar / a[i];
+        }
         return b;
     }
 
@@ -361,7 +373,8 @@ namespace samurai
     template <class T, class NumberType>
     auto pow(const StdVectorWrapper<T>& a, NumberType exponent)
     {
-        StdVectorWrapper<T> b;
+        StdVectorWrapper<T> b(a.size());
+#pragma omp simd
         for (std::size_t i = 0; i < a.size(); ++i)
         {
             b[i] = std::pow(a[i], exponent);
@@ -372,6 +385,7 @@ namespace samurai
     template <class T, class NumberType>
     StdVectorWrapper<T>&& pow(StdVectorWrapper<T>&& a, NumberType exponent)
     {
+#pragma omp simd
         for (std::size_t i = 0; i < a.size(); ++i)
         {
             a[i] = std::pow(a[i], exponent);
