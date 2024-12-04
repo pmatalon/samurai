@@ -16,14 +16,6 @@ namespace samurai
         interface_it.init(mesh_interval);
         // times::timers_b.stop("iterator interval init");
 
-        using cell_t = typename interface_iterator_t::cell_t;
-
-        auto simple_cell_copy = [](cell_t& dest, const cell_t& src)
-        {
-            dest.index   = src.index;
-            dest.indices = src.indices;
-        };
-
         if constexpr (get_type == Get::Intervals)
         {
             f(interface_it, comput_stencil_it);

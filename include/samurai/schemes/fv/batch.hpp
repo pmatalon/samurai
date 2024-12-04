@@ -17,7 +17,7 @@ namespace samurai
 
         std::array<dynamic_vector_t, array_size> m_batch;
 
-        std::size_t m_add_counter = 0;
+        std::size_t m_position = 0;
 
       public:
 
@@ -46,19 +46,19 @@ namespace samurai
             // return m_size;
         }
 
-        inline const auto& add_counter() const
+        inline const auto& position() const
         {
-            return m_add_counter;
+            return m_position;
         }
 
-        inline auto& add_counter()
+        inline auto& position()
         {
-            return m_add_counter;
+            return m_position;
         }
 
-        inline void reset_add_counter()
+        inline void reset_position()
         {
-            m_add_counter = 0;
+            m_position = 0;
         }
 
         inline auto& operator[](std::size_t index_in_array)
@@ -120,16 +120,16 @@ namespace samurai
         {
             if constexpr (array_size == 1)
             {
-                m_batch[m_add_counter].values;
+                m_batch[m_position].values;
             }
             else
             {
                 for (std::size_t i = 0; i < array_size; ++i)
                 {
-                    m_batch[i][m_add_counter] = values[i];
+                    m_batch[i][m_position] = values[i];
                 }
             }
-            m_add_counter++;
+            m_position++;
         }
 
         template <class Func>
@@ -137,16 +137,16 @@ namespace samurai
         {
             if constexpr (array_size == 1)
             {
-                m_batch[m_add_counter].values;
+                m_batch[m_position].values;
             }
             else
             {
                 for (std::size_t i = 0; i < array_size; ++i)
                 {
-                    copy(m_batch[i][m_add_counter], values[i]);
+                    copy(m_batch[i][m_position], values[i]);
                 }
             }
-            m_add_counter++;
+            m_position++;
         }
 
         // inline bool empty() const

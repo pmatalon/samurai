@@ -528,6 +528,8 @@ namespace samurai
             }
             m_mesh_interval = &origin_mesh_interval;
 
+            m_mesh_interval = &mesh_interval;
+
             // origin of the stencil
             cell_t& origin_cell    = m_cells[m_stencil_analyzer.origin_index];
             origin_cell.indices[0] = origin_mesh_interval.i.start;
