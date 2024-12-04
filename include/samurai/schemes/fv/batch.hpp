@@ -46,7 +46,12 @@ namespace samurai
             // return m_size;
         }
 
-        inline auto add_counter() const
+        inline const auto& add_counter() const
+        {
+            return m_add_counter;
+        }
+
+        inline auto& add_counter()
         {
             return m_add_counter;
         }

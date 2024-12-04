@@ -18,7 +18,8 @@ namespace samurai
         interface_it.init(mesh_interval);
         // times::timers_b.stop("iterator interval init");
 
-        using cell_t          = typename interface_iterator_t::cell_t;
+        using cell_t = typename interface_iterator_t::cell_t;
+
         auto simple_cell_copy = [](cell_t& dest, const cell_t& src)
         {
             dest.index   = src.index;
@@ -45,13 +46,19 @@ namespace samurai
             {
                 // times::timers_b.start("make cell batch");
                 auto n = std::min(to_process, args::batch_size - interface_batch.add_counter());
-                for (std::size_t ii = 0; ii < n; ++ii)
+                if constexpr (std::is_same_v<IteratorStencil<typename stencil_iterator_t::mesh_t, 2>, interface_iterator_t>)
                 {
-                    interface_batch.add(interface_it.cells(), simple_cell_copy);
-                    comput_stencil_batch.add(comput_stencil_it.cells(), simple_cell_copy);
-                    interface_it.move_next();
-                    comput_stencil_it.move_next();
+                    interface_it.move_to_batch(n, interface_batch);
                 }
+                else
+                {
+                    for (std::size_t ii = 0; ii < n; ++ii)
+                    {
+                        interface_batch.add(interface_it.cells(), simple_cell_copy);
+                        interface_it.move_next();
+                    }
+                }
+                comput_stencil_it.move_to_batch(n, comput_stencil_batch);
                 to_process -= n;
                 // times::timers_b.stop("make cell batch");
                 if (interface_batch.add_counter() == args::batch_size)
