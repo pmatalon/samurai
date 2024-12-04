@@ -483,8 +483,6 @@ namespace samurai
 
         void init(const mesh_interval_t& mesh_interval)
         {
-            m_mesh_interval = &mesh_interval;
-
             if (mesh_interval.level != m_cells[0].level)
             {
                 double length = m_mesh.cell_length(mesh_interval.level);
@@ -494,6 +492,8 @@ namespace samurai
                     cell.length = length;
                 }
             }
+
+            m_mesh_interval = &mesh_interval;
 
             // origin of the stencil
             cell_t& origin_cell    = m_cells[m_origin_cell];
@@ -571,6 +571,16 @@ namespace samurai
             return m_stencil;
         }
 
+        inline const auto& cells() const
+        {
+            return m_cells;
+        }
+
+        inline auto& cells()
+        {
+            return m_cells;
+        }
+
         inline void move_next()
         {
             for (cell_t& cell : m_cells)
@@ -581,13 +591,13 @@ namespace samurai
         }
 
         template <class stencil_batch_t>
-        inline void move_to_batch(std::size_t length, stencil_batch_t& stencil_batch)
+        inline void copy_to_batch(std::size_t length, stencil_batch_t& stencil_batch)
         {
             using index_t = typename cell_t::index_t;
             using value_t = typename cell_t::value_t;
 
-            auto start = stencil_batch.add_counter();
-            stencil_batch.add(m_cells); //, simple_cell_copy);
+            auto start = stencil_batch.position();
+            stencil_batch.add(m_cells);
             for (std::size_t s = 0; s < stencil_size; ++s)
             {
 #pragma omp simd
@@ -598,22 +608,12 @@ namespace samurai
                     stencil_batch[s][start + ii].indices[0] = m_cells[s].indices[0] + static_cast<value_t>(ii);
                 }
             }
-            stencil_batch.add_counter() += length - 1;
+            stencil_batch.position() += length - 1;
             for (cell_t& cell : m_cells)
             {
                 cell.index += length;
                 cell.indices[0] += length;
             }
-        }
-
-        inline const auto& cells() const
-        {
-            return m_cells;
-        }
-
-        inline auto& cells()
-        {
-            return m_cells;
         }
     };
 
@@ -663,6 +663,11 @@ namespace samurai
             return m_fine_it->interval();
         }
 
+        inline const auto& cells() const
+        {
+            return m_cells;
+        }
+
         inline void move_next()
         {
             // Move fine cell
@@ -675,9 +680,19 @@ namespace samurai
             m_move_coarse_cell = !m_move_coarse_cell;
         }
 
-        inline const auto& cells() const
+        template <class stencil_batch_t>
+        inline void copy_to_batch(std::size_t length, stencil_batch_t& stencil_batch)
         {
-            return m_cells;
+            for (std::size_t ii = 0; ii < length; ++ii)
+            {
+                stencil_batch.add(m_cells,
+                                  [](cell_t& dest, const cell_t& src)
+                                  {
+                                      dest.index   = src.index;
+                                      dest.indices = src.indices;
+                                  });
+                move_next();
+            }
         }
     };
 
