@@ -450,6 +450,7 @@ namespace samurai
 
         static constexpr std::size_t dim          = Mesh::dim;
         static constexpr std::size_t stencil_size = stencil_size_;
+        using mesh_t                              = Mesh;
         using mesh_interval_t                     = typename Mesh::mesh_interval_t;
         using coord_index_t                       = typename Mesh::config::interval_t::coord_index_t;
         using cell_t                              = Cell<dim, typename Mesh::interval_t>;
@@ -576,6 +577,32 @@ namespace samurai
             {
                 ++cell.index;      // increment cell index
                 ++cell.indices[0]; // increment x-coordinate
+            }
+        }
+
+        template <class stencil_batch_t>
+        inline void move_to_batch(std::size_t length, stencil_batch_t& stencil_batch)
+        {
+            using index_t = typename cell_t::index_t;
+            using value_t = typename cell_t::value_t;
+
+            auto start = stencil_batch.add_counter();
+            stencil_batch.add(m_cells); //, simple_cell_copy);
+            for (std::size_t s = 0; s < stencil_size; ++s)
+            {
+#pragma omp simd
+                for (std::size_t ii = 1; ii < length; ++ii)
+                {
+                    stencil_batch[s][start + ii].level      = m_cells[s].level;
+                    stencil_batch[s][start + ii].index      = m_cells[s].index + static_cast<index_t>(ii);
+                    stencil_batch[s][start + ii].indices[0] = m_cells[s].indices[0] + static_cast<value_t>(ii);
+                }
+            }
+            stencil_batch.add_counter() += length - 1;
+            for (cell_t& cell : m_cells)
+            {
+                cell.index += length;
+                cell.indices[0] += length;
             }
         }
 
