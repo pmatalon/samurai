@@ -125,7 +125,7 @@ namespace samurai
                             auto left_cell_contrib  = contribution(flux_values[0], h, h);
                             auto right_cell_contrib = contribution(flux_values[1], h, h);
                             // times::timers_b.stop("computation");
-                            // times::timers_b.start("copy to field");
+                            //  times::timers_b.start("copy to field");
                             apply_contrib(interface_cells[0], left_cell_contrib);
                             apply_contrib(interface_cells[1], right_cell_contrib);
                             // times::timers_b.stop("copy to field");
@@ -133,29 +133,29 @@ namespace samurai
                         else if constexpr (get_type == Get::CellBatches)
                         {
                             flux_values.resize(interface_cells.size());
-                            times::timers_b.start("transform");
+                            // times::timers_b.start("transform");
                             transform(comput_cells,
                                       stencil_values,
                                       [&](const auto& cell)
                                       {
                                           return field[cell];
                                       });
-                            times::timers_b.stop("transform");
+                            // times::timers_b.stop("transform");
 
-                            times::timers_b.start("computation");
+                            // times::timers_b.start("computation");
                             flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
                             auto factor = h_factor(h, h);
                             flux_values *= factor;
-                            times::timers_b.stop("computation");
-                            times::timers_b.start("copy to field");
+                            // times::timers_b.stop("computation");
+                            // times::timers_b.start("copy to field");
                             apply_contrib(interface_cells[0], flux_values);
-                            times::timers_b.stop("copy to field");
-                            times::timers_b.start("computation");
+                            // times::timers_b.stop("copy to field");
+                            // times::timers_b.start("computation");
                             flux_values *= -1;
-                            times::timers_b.stop("computation");
-                            times::timers_b.start("copy to field");
+                            // times::timers_b.stop("computation");
+                            // times::timers_b.start("copy to field");
                             apply_contrib(interface_cells[1], flux_values);
-                            times::timers_b.stop("copy to field");
+                            // times::timers_b.stop("copy to field");
                         }
                     });
             }
