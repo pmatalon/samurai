@@ -81,17 +81,6 @@ namespace samurai
         auto q2 =  1./3 * f[j  ] + 5./6 * f[j+1] -  1./6 * f[j+2];
 
         // (3.2)-(3.4)
-        // auto tmp_1 = f[j-2] -2*f[j-1] +   f[j  ];
-        // auto tmp_2 = f[j-2] -4*f[j-1] + 3*f[j  ];
-        // auto IS0 = 13./12 * (tmp_1*tmp_1) + 1./4 * (tmp_2*tmp_2);
-
-        // tmp_1 = f[j-1] - 2*f[j  ] + f[j+1];
-        // tmp_2 = f[j-1]            - f[j+1];
-        // auto IS1 = 13./12 * (tmp_1*tmp_1) + 1./4 * (tmp_2*tmp_2);
-
-        // tmp_1 =   f[j  ] -2*f[j+1] + f[j+2];
-        // tmp_2 = 3*f[j  ] -4*f[j+1] + f[j+2];
-        // auto IS2 = 13./12 * (tmp_1*tmp_1) + 1./4 * (tmp_2*tmp_2);
         auto IS0 = 13./12 * pow(f[j-2] - 2*f[j-1] + f[j  ], 2) + 1./4 * pow(  f[j-2] -4*f[j-1] + 3*f[j  ], 2);
         auto IS1 = 13./12 * pow(f[j-1] - 2*f[j  ] + f[j+1], 2) + 1./4 * pow(  f[j-1]           -   f[j+1], 2);
         auto IS2 = 13./12 * pow(f[j  ] - 2*f[j+1] + f[j+2], 2) + 1./4 * pow(3*f[j  ] -4*f[j+1] +   f[j+2], 2);
@@ -99,12 +88,6 @@ namespace samurai
         // clang-format on
 
         // (2.16) and Table II (r=3)
-        // IS0 += eps;
-        // IS1 += eps;
-        // IS2 += eps;
-        // auto alpha0 = 0.1 / pow(IS0, 2);
-        // auto alpha1 = 0.6 / pow(IS1, 2);
-        // auto alpha2 = 0.3 / pow(IS2, 2);
         auto alpha0 = 0.1 / pow((eps + IS0), 2);
         auto alpha1 = 0.6 / pow((eps + IS1), 2);
         auto alpha2 = 0.3 / pow((eps + IS2), 2);
@@ -116,8 +99,6 @@ namespace samurai
         auto omega2     = alpha2 / sum_alphas;
 
         // (2.10)
-        // value_type flux = omega0 * q0 + omega1 * q1 + omega2 * q2;
-        // return flux;
         flux_values = omega0 * q0 + omega1 * q1 + omega2 * q2;
     }
 
