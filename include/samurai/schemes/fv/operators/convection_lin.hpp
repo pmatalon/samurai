@@ -120,7 +120,9 @@ namespace samurai
                     {
                         Array<FluxValue<cfg>, 5> f({u[cells[0]], u[cells[1]], u[cells[2]], u[cells[3]], u[cells[4]]});
                         f *= velocity(d);
-                        return compute_weno5_flux(f);
+                        FluxValue<cfg> flux;
+                        compute_weno5_flux(flux, f);
+                        return flux;
                     };
 
                     weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/,
@@ -144,7 +146,9 @@ namespace samurai
                     {
                         Array<FluxValue<cfg>, 5> f({u[cells[5]], u[cells[4]], u[cells[3]], u[cells[2]], u[cells[1]]});
                         f *= velocity(d);
-                        return compute_weno5_flux(f);
+                        FluxValue<cfg> flux;
+                        compute_weno5_flux(flux, f);
+                        return flux;
                     };
 
                     weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/,
