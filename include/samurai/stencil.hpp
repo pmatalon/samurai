@@ -594,21 +594,21 @@ namespace samurai
         inline void copy_to_batch(std::size_t length, stencil_batch_t& stencil_batch)
         {
             using index_t = typename cell_t::index_t;
-            using value_t = typename cell_t::value_t;
+            // using value_t = typename cell_t::value_t;
 
             auto start = stencil_batch.position();
-            stencil_batch.add(m_cells);
+            // stencil_batch.add(m_cells);
             for (std::size_t s = 0; s < stencil_size; ++s)
             {
 #pragma omp simd
-                for (std::size_t ii = 1; ii < length; ++ii)
+                for (std::size_t ii = 0; ii < length; ++ii)
                 {
-                    stencil_batch[s][start + ii].level      = m_cells[s].level;
-                    stencil_batch[s][start + ii].index      = m_cells[s].index + static_cast<index_t>(ii);
-                    stencil_batch[s][start + ii].indices[0] = m_cells[s].indices[0] + static_cast<value_t>(ii);
+                    // stencil_batch[s][start + ii].level      = m_cells[s].level;
+                    stencil_batch[s][start + ii].index = m_cells[s].index + static_cast<index_t>(ii);
+                    // stencil_batch[s][start + ii].indices[0] = m_cells[s].indices[0] + static_cast<value_t>(ii);
                 }
             }
-            stencil_batch.position() += length - 1;
+            stencil_batch.position() += length;
             for (cell_t& cell : m_cells)
             {
                 cell.index += length;
@@ -688,8 +688,8 @@ namespace samurai
                 stencil_batch.add(m_cells,
                                   [](cell_t& dest, const cell_t& src)
                                   {
-                                      dest.index   = src.index;
-                                      dest.indices = src.indices;
+                                      dest.index = src.index;
+                                      // dest.indices = src.indices;
                                   });
                 move_next();
             }
