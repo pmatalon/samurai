@@ -105,7 +105,7 @@ namespace samurai
 
             ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values(args::batch_size);
             Batch<FluxValue<cfg>> flux_values(args::batch_size);
-            auto context = flux_def.create_context();
+            auto context = flux_def.create_temp_variables();
 
             // Same level
             for (std::size_t level = min_level; level <= max_level; ++level)
