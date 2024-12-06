@@ -73,6 +73,8 @@ namespace samurai
         {
             interface_batch.resize(args::batch_size);
             comput_stencil_batch.resize(args::batch_size);
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
@@ -146,6 +148,8 @@ namespace samurai
         {
             interface_batch.resize(args::batch_size);
             comput_stencil_batch.resize(args::batch_size);
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(
@@ -224,6 +228,8 @@ namespace samurai
         {
             interface_batch.resize(args::batch_size);
             comput_stencil_batch.resize(args::batch_size);
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(

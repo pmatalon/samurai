@@ -42,8 +42,9 @@ namespace samurai
 
         inline std::size_t size() const
         {
-            return m_batch[0].size();
-            // return m_size;
+            // return m_batch[0].size();
+            //  return m_size;
+            return m_position;
         }
 
         inline const auto& position() const
@@ -171,11 +172,12 @@ namespace samurai
         output.resize(input.size());
         for (std::size_t i = 0; i < size; ++i)
         {
-            for (std::size_t j = 0; j < input.size(); ++j)
+            for (std::size_t j = 0; j < input.position(); ++j)
             {
                 output[i][j] = op(input[i][j]);
             }
         }
+        output.position() = input.position();
     }
 
 } // end namespace samurai
