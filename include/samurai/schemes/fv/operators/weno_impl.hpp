@@ -24,7 +24,7 @@ namespace samurai
      * Based on 'Efficent implementation of Weighted ENO schemes', Jiang and Shu, 1996.
      */
     template <class flux_values_t, class stencil_values>
-    auto compute_weno5_flux(flux_values_t& flux, stencil_values& f)
+    inline auto compute_weno5_flux(flux_values_t& flux, stencil_values& f)
     {
         using value_type = typename stencil_values::value_type;
         // using scalar_type = std::conditional_t<std::is_floating_point_v<value_type>, value_type, typename value_type::value_type>;
@@ -36,14 +36,14 @@ namespace samurai
         // clang-format off
 
         // (2.8) and Table I (r=3)
-        auto q0 =  1./3 * f[j-2] - 7./6 * f[j-1] + 11./6 * f[j  ];
-        auto q1 = -1./6 * f[j-1] + 5./6 * f[j  ] +  1./3 * f[j+1];
-        auto q2 =  1./3 * f[j  ] + 5./6 * f[j+1] -  1./6 * f[j+2];
+        auto q0 =  1./3. * f[j-2] - 7./6. * f[j-1] + 11./6. * f[j  ];
+        auto q1 = -1./6. * f[j-1] + 5./6. * f[j  ] +  1./3. * f[j+1];
+        auto q2 =  1./3. * f[j  ] + 5./6. * f[j+1] -  1./6. * f[j+2];
 
         // (3.2)-(3.4)
-        auto IS0 = 13./12 * pow(f[j-2] - 2*f[j-1] + f[j  ], 2) + 1./4 * pow(  f[j-2] -4*f[j-1] + 3*f[j  ], 2);
-        auto IS1 = 13./12 * pow(f[j-1] - 2*f[j  ] + f[j+1], 2) + 1./4 * pow(  f[j-1]           -   f[j+1], 2);
-        auto IS2 = 13./12 * pow(f[j  ] - 2*f[j+1] + f[j+2], 2) + 1./4 * pow(3*f[j  ] -4*f[j+1] +   f[j+2], 2);
+        auto IS0 = 13./12. * pow(f[j-2] - 2.*f[j-1] + f[j  ], 2) + 1./4. * pow(   f[j-2] -4.*f[j-1] + 3.*f[j  ], 2);
+        auto IS1 = 13./12. * pow(f[j-1] - 2.*f[j  ] + f[j+1], 2) + 1./4. * pow(   f[j-1]            -    f[j+1], 2);
+        auto IS2 = 13./12. * pow(f[j  ] - 2.*f[j+1] + f[j+2], 2) + 1./4. * pow(3.*f[j  ] -4.*f[j+1] +    f[j+2], 2);
 
         // clang-format on
 
@@ -64,8 +64,8 @@ namespace samurai
         flux = omega0 * q0 + omega1 * q1 + omega2 * q2;
     }
 
-    template <class flux_values_t, class stencil_values>
-    void compute_weno5_flux__batch(flux_values_t& flux_values, const stencil_values& f)
+    template <class flux_values_t, class stencil_values, class tmp_variables_t>
+    inline void compute_weno5_flux__batch(flux_values_t& flux_values, const stencil_values& f, tmp_variables_t& tmp)
     {
         using value_type = typename stencil_values::value_type;
         // using scalar_type = std::conditional_t<std::is_floating_point_v<value_type>, value_type, typename value_type::value_type>;
@@ -75,14 +75,21 @@ namespace samurai
         const scalar_type eps          = 1e-6;
 
         auto batch_size = flux_values.size();
+        assert(batch_size != 0);
 
-        flux_values_t q0(batch_size);
-        flux_values_t q1(batch_size);
-        flux_values_t q2(batch_size);
+        // flux_values_t q0(batch_size);
+        // flux_values_t q1(batch_size);
+        // flux_values_t q2(batch_size);
 
-        flux_values_t IS0(batch_size);
-        flux_values_t IS1(batch_size);
-        flux_values_t IS2(batch_size);
+        // flux_values_t IS0(batch_size);
+        // flux_values_t IS1(batch_size);
+        // flux_values_t IS2(batch_size);
+        auto& q0  = tmp.q0;
+        auto& q1  = tmp.q1;
+        auto& q2  = tmp.q2;
+        auto& IS0 = tmp.IS0;
+        auto& IS1 = tmp.IS1;
+        auto& IS2 = tmp.IS2;
 
         for (std::size_t i = 0; i < batch_size; ++i)
         {

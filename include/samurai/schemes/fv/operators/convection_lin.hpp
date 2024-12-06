@@ -97,6 +97,36 @@ namespace samurai
 
         using cfg = FluxConfig<SchemeType::NonLinear, output_field_size, stencil_size, Field>;
 
+        struct TempVariables
+        {
+            // StencilValuesBatch<cfg> f;
+
+            // Batch<FluxValue<cfg>> q0;
+            // Batch<FluxValue<cfg>> q1;
+            // Batch<FluxValue<cfg>> q2;
+            // Batch<FluxValue<cfg>> IS0;
+            // Batch<FluxValue<cfg>> IS1;
+            // Batch<FluxValue<cfg>> IS2;
+
+            // void resize(std::size_t size)
+            // {
+            // f.resize(size);
+            // q0.resize(size);
+            // q1.resize(size);
+            // q2.resize(size);
+            // IS0.resize(size);
+            // IS1.resize(size);
+            // IS2.resize(size);
+            // f.position() = size;
+            // q0.position()  = size;
+            // q1.position()  = size;
+            // q2.position()  = size;
+            // IS0.position() = size;
+            // IS1.position() = size;
+            // IS2.position() = size;
+            // }
+        };
+
         FluxDefinition<cfg> weno5;
 
         static_for<0, dim>::apply( // for each positive Cartesian direction 'd'
@@ -109,9 +139,10 @@ namespace samurai
                 //        weno5[1].stencil = {{ 0,-2}, { 0,-1}, {0,0}, {0,1}, {0,2}, {0,3}};
                 weno5[d].stencil = line_stencil<dim, d>(-2, -1, 0, 1, 2, 3);
 
-                weno5[d].create_context = []()
+                weno5[d].create_temp_variables = []()
                 {
-                    return StencilValuesBatch<cfg>();
+                    // return StencilValuesBatch<cfg>();
+                    return new TempVariables();
                 };
 
                 if (velocity(d) >= 0)
@@ -126,18 +157,32 @@ namespace samurai
                     };
 
                     weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/,
-                                                                     auto& flux_values,
-                                                                     StencilValuesBatch<cfg>& ctx,
+                                                                     Batch<FluxValue<cfg>>& flux_values,
+                                                                     void* /*ctx*/,
                                                                      const StencilValuesBatch<cfg>& stencil_values)
                     {
-                        auto& f = ctx;
-                        f.resize(stencil_values.size());
-                        f[0] = velocity(d) * stencil_values[0];
-                        f[1] = velocity(d) * stencil_values[1];
-                        f[2] = velocity(d) * stencil_values[2];
-                        f[3] = velocity(d) * stencil_values[3];
-                        f[4] = velocity(d) * stencil_values[4];
-                        compute_weno5_flux__batch(flux_values, f);
+                        // TempVariables* tmp = static_cast<TempVariables*>(ctx);
+                        // tmp->resize(stencil_values.size());
+                        // auto& f = tmp->f;
+                        // assert(stencil_values.size() > 0);
+                        // for (std::size_t i = 0; i < stencil_values.size(); ++i)
+                        // {
+                        //     f[0][i] = velocity(d) * stencil_values[0][i];
+                        //     f[1][i] = velocity(d) * stencil_values[1][i];
+                        //     f[2][i] = velocity(d) * stencil_values[2][i];
+                        //     f[3][i] = velocity(d) * stencil_values[3][i];
+                        //     f[4][i] = velocity(d) * stencil_values[4][i];
+                        // }
+                        // compute_weno5_flux__batch(flux_values, f, *tmp);
+                        for (std::size_t i = 0; i < stencil_values.size(); ++i)
+                        {
+                            Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[0][i],
+                                                        velocity(d) * stencil_values[1][i],
+                                                        velocity(d) * stencil_values[2][i],
+                                                        velocity(d) * stencil_values[3][i],
+                                                        velocity(d) * stencil_values[4][i]});
+                            compute_weno5_flux(flux_values[i], f);
+                        }
                     };
                 }
                 else
@@ -152,18 +197,32 @@ namespace samurai
                     };
 
                     weno5[d].cons_flux_function__batch = [&velocity](const auto& /*cells*/,
-                                                                     auto& flux_values,
-                                                                     StencilValuesBatch<cfg>& ctx,
+                                                                     Batch<FluxValue<cfg>>& flux_values,
+                                                                     void* /*ctx*/,
                                                                      const StencilValuesBatch<cfg>& stencil_values)
                     {
-                        auto& f = ctx;
-                        f.resize(stencil_values.size());
-                        f[0] = velocity(d) * stencil_values[5];
-                        f[1] = velocity(d) * stencil_values[4];
-                        f[2] = velocity(d) * stencil_values[3];
-                        f[3] = velocity(d) * stencil_values[2];
-                        f[4] = velocity(d) * stencil_values[1];
-                        compute_weno5_flux__batch(flux_values, f);
+                        // TempVariables* tmp = static_cast<TempVariables*>(ctx);
+                        // tmp->resize(stencil_values.size());
+                        // auto& f = tmp->f;
+                        // assert(stencil_values.size() > 0);
+                        // for (std::size_t i = 0; i < stencil_values.size(); ++i)
+                        // {
+                        //     f[0][i] = velocity(d) * stencil_values[5][i];
+                        //     f[1][i] = velocity(d) * stencil_values[4][i];
+                        //     f[2][i] = velocity(d) * stencil_values[3][i];
+                        //     f[3][i] = velocity(d) * stencil_values[2][i];
+                        //     f[4][i] = velocity(d) * stencil_values[1][i];
+                        // }
+                        // compute_weno5_flux__batch(flux_values, f, *tmp);
+                        for (std::size_t i = 0; i < stencil_values.size(); ++i)
+                        {
+                            Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[5][i],
+                                                        velocity(d) * stencil_values[4][i],
+                                                        velocity(d) * stencil_values[3][i],
+                                                        velocity(d) * stencil_values[2][i],
+                                                        velocity(d) * stencil_values[1][i]});
+                            compute_weno5_flux(flux_values[i], f);
+                        }
                     };
                 }
             });
