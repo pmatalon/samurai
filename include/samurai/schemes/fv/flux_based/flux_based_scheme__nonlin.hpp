@@ -103,9 +103,18 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
-            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values(args::batch_size);
-            Batch<FluxValue<cfg>> flux_values(args::batch_size);
-            auto context = flux_def.create_temp_variables();
+            ArrayBatch<cell_t, 2> interface_batch;
+            ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
+            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+            Batch<FluxValue<cfg>> flux_values;
+            if constexpr (get_type == Get::CellBatches)
+            {
+                interface_batch.resize(args::batch_size);
+                comput_stencil_batch.resize(args::batch_size);
+                stencil_values.resize(args::batch_size);
+                flux_values.resize(args::batch_size);
+            }
+            void* temp_variables = flux_def.create_temp_variables();
 
             // Same level
             for (std::size_t level = min_level; level <= max_level; ++level)
@@ -117,6 +126,8 @@ namespace samurai
                     level,
                     flux_def.direction,
                     flux_def.stencil,
+                    interface_batch,
+                    comput_stencil_batch,
                     [&](auto& interface_cells, auto& comput_cells)
                     {
                         if constexpr (get_type == Get::Cells)
@@ -141,10 +152,11 @@ namespace samurai
                                       {
                                           return field[cell];
                                       });
+
                             // times::timers_b.stop("transform");
 
                             // times::timers_b.start("computation");
-                            flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
+                            flux_def.cons_flux_function__batch(comput_cells, flux_values, temp_variables, stencil_values);
                             auto factor = h_factor(h, h);
                             flux_values *= factor;
                             // times::timers_b.stop("computation");
@@ -177,6 +189,8 @@ namespace samurai
                         level,
                         flux_def.direction,
                         flux_def.stencil,
+                        interface_batch,
+                        comput_stencil_batch,
                         [&](auto& interface_cells, auto& comput_cells)
                         {
                             if constexpr (get_type == Get::Cells)
@@ -204,7 +218,7 @@ namespace samurai
                                 // times::timers_b.stop("transform");
 
                                 // times::timers_b.start("computation");
-                                flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
+                                flux_def.cons_flux_function__batch(comput_cells, flux_values, temp_variables, stencil_values);
                                 auto left_factor = h_factor(h_lp1, h_l);
                                 flux_values *= left_factor;
                                 // times::timers_b.stop("computation");
@@ -213,7 +227,7 @@ namespace samurai
                                 // times::timers_b.stop("copy to field");
                                 // times::timers_b.start("computation");
                                 auto right_factor = h_factor(h_lp1, h_lp1);
-                                flux_values *= -1 / left_factor * right_factor; // cancel left factor and apply right one
+                                flux_values *= -1 / left_factor * right_factor; // add minus sign, cancel left factor and apply right one
                                 // times::timers_b.stop("computation");
                                 // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[1], flux_values);
@@ -231,6 +245,8 @@ namespace samurai
                         level,
                         flux_def.direction,
                         flux_def.stencil,
+                        interface_batch,
+                        comput_stencil_batch,
                         [&](auto& interface_cells, auto& comput_cells)
                         {
                             if constexpr (get_type == Get::Cells)
@@ -258,7 +274,7 @@ namespace samurai
                                 // times::timers_b.stop("transform");
 
                                 // times::timers_b.start("computation");
-                                flux_def.cons_flux_function__batch(comput_cells, flux_values, context, stencil_values);
+                                flux_def.cons_flux_function__batch(comput_cells, flux_values, temp_variables, stencil_values);
                                 auto left_factor = h_factor(h_lp1, h_lp1);
                                 flux_values *= left_factor;
                                 // times::timers_b.stop("computation");
@@ -267,7 +283,7 @@ namespace samurai
                                 // times::timers_b.stop("copy to field");
                                 // times::timers_b.start("computation");
                                 auto right_factor = h_factor(h_lp1, h_l);
-                                flux_values *= -1 / left_factor * right_factor; // cancel left factor and apply right one
+                                flux_values *= -1 / left_factor * right_factor; // add minus sign, cancel left factor and apply right one
                                 // times::timers_b.start("computation");
                                 // times::timers_b.start("copy to field");
                                 apply_contrib(interface_cells[1], flux_values);

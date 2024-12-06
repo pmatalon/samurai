@@ -64,12 +64,14 @@ namespace samurai
                                                  std::size_t level,
                                                  const DirectionVector<Mesh::dim>& direction,
                                                  const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
+                                                 ArrayBatch<typename Mesh::cell_t, 2>& interface_batch,
+                                                 ArrayBatch<typename Mesh::cell_t, comput_stencil_size>& comput_stencil_batch,
                                                  Func&& f)
     {
         static constexpr std::size_t dim = Mesh::dim;
         using mesh_id_t                  = typename Mesh::mesh_id_t;
         using mesh_interval_t            = typename Mesh::mesh_interval_t;
-        using cell_t                     = typename Mesh::cell_t;
+        // using cell_t                     = typename Mesh::cell_t;
 
         Stencil<2, dim> interface_stencil = in_out_stencil<dim>(direction);
 
@@ -90,12 +92,15 @@ namespace samurai
         auto interface_it            = make_stencil_iterator(mesh, interface_stencil);
         auto comput_stencil_it       = make_stencil_iterator(mesh, comput_stencil);
 #endif
-        ArrayBatch<cell_t, 2> interface_batch;
-        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        // ArrayBatch<cell_t, 2> interface_batch;
+        // ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        // if constexpr (get_type == Get::CellBatches)
+        // {
+        //     interface_batch.resize(args::batch_size);
+        //     comput_stencil_batch.resize(args::batch_size);
+        // }
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.resize(args::batch_size);
-            comput_stencil_batch.resize(args::batch_size);
             interface_batch.reset_position();
             comput_stencil_batch.reset_position();
         }
@@ -126,6 +131,31 @@ namespace samurai
         }
     }
 
+    template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Mesh, std::size_t comput_stencil_size, class Func>
+    void for_each_interior_interface__same_level(const Mesh& mesh,
+                                                 std::size_t level,
+                                                 const DirectionVector<Mesh::dim>& direction,
+                                                 const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
+                                                 Func&& f)
+    {
+        using cell_t = typename Mesh::cell_t;
+
+        ArrayBatch<cell_t, 2> interface_batch;
+        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        if constexpr (get_type == Get::CellBatches)
+        {
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
+        }
+        for_each_interior_interface__same_level<run_type, get_type>(mesh,
+                                                                    level,
+                                                                    direction,
+                                                                    comput_stencil,
+                                                                    interface_batch,
+                                                                    comput_stencil_batch,
+                                                                    std::forward<Func>(f));
+    }
+
     /**
      * Iterates over the level jumps (level --> level+1) that occur in the chosen direction.
      *
@@ -144,11 +174,13 @@ namespace samurai
                                                            std::size_t level,
                                                            const DirectionVector<Mesh::dim>& direction,
                                                            const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
+                                                           ArrayBatch<typename Mesh::cell_t, 2>& interface_batch,
+                                                           ArrayBatch<typename Mesh::cell_t, comput_stencil_size>& comput_stencil_batch,
                                                            Func&& f)
     {
         using mesh_id_t       = typename Mesh::mesh_id_t;
         using mesh_interval_t = typename Mesh::mesh_interval_t;
-        using cell_t          = typename Mesh::cell_t;
+        // using cell_t          = typename Mesh::cell_t;
 
         if (level >= mesh.max_level())
         {
@@ -178,12 +210,15 @@ namespace samurai
         auto comput_stencil_it       = make_stencil_iterator(mesh, comput_stencil);
         auto interface_it            = make_leveljump_iterator<0>(comput_stencil_it, direction_index);
 #endif
-        ArrayBatch<cell_t, 2> interface_batch;
-        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        // ArrayBatch<cell_t, 2> interface_batch;
+        // ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        // if constexpr (get_type == Get::CellBatches)
+        // {
+        //     interface_batch.resize(args::batch_size);
+        //     comput_stencil_batch.resize(args::batch_size);
+        // }
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.resize(args::batch_size);
-            comput_stencil_batch.resize(args::batch_size);
             interface_batch.reset_position();
             comput_stencil_batch.reset_position();
         }
@@ -214,6 +249,31 @@ namespace samurai
         }
     }
 
+    template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Mesh, std::size_t comput_stencil_size, class Func>
+    void for_each_interior_interface__level_jump_direction(const Mesh& mesh,
+                                                           std::size_t level,
+                                                           const DirectionVector<Mesh::dim>& direction,
+                                                           const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
+                                                           Func&& f)
+    {
+        using cell_t = typename Mesh::cell_t;
+
+        ArrayBatch<cell_t, 2> interface_batch;
+        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        if constexpr (get_type == Get::CellBatches)
+        {
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
+        }
+        for_each_interior_interface__level_jump_direction<run_type, get_type>(mesh,
+                                                                              level,
+                                                                              direction,
+                                                                              comput_stencil,
+                                                                              interface_batch,
+                                                                              comput_stencil_batch,
+                                                                              std::forward<Func>(f));
+    }
+
     /**
      * Iterates over the level jumps (level --> level+1) that occur in the OPPOSITE direction of @param direction.
      *
@@ -228,16 +288,19 @@ namespace samurai
      *       'interface_cells' = [cell_{l+1}, cell_{l}].
      */
     template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Mesh, std::size_t comput_stencil_size, class Func>
-    void for_each_interior_interface__level_jump_opposite_direction(const Mesh& mesh,
-                                                                    std::size_t level,
-                                                                    const DirectionVector<Mesh::dim>& direction,
-                                                                    const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
-                                                                    Func&& f)
+    void
+    for_each_interior_interface__level_jump_opposite_direction(const Mesh& mesh,
+                                                               std::size_t level,
+                                                               const DirectionVector<Mesh::dim>& direction,
+                                                               const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
+                                                               ArrayBatch<typename Mesh::cell_t, 2>& interface_batch,
+                                                               ArrayBatch<typename Mesh::cell_t, comput_stencil_size>& comput_stencil_batch,
+                                                               Func&& f)
     {
         static constexpr std::size_t dim = Mesh::dim;
         using mesh_id_t                  = typename Mesh::mesh_id_t;
         using mesh_interval_t            = typename Mesh::mesh_interval_t;
-        using cell_t                     = typename Mesh::cell_t;
+        // using cell_t                     = typename Mesh::cell_t;
 
         if (level >= mesh.max_level())
         {
@@ -270,12 +333,15 @@ namespace samurai
         auto minus_comput_stencil_it = make_stencil_iterator(mesh, minus_comput_stencil);
         auto interface_it            = make_leveljump_iterator<1>(minus_comput_stencil_it, minus_direction_index);
 #endif
-        ArrayBatch<cell_t, 2> interface_batch;
-        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        // ArrayBatch<cell_t, 2> interface_batch;
+        // ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        // if constexpr (get_type == Get::CellBatches)
+        // {
+        //     interface_batch.resize(args::batch_size);
+        //     comput_stencil_batch.resize(args::batch_size);
+        // }
         if constexpr (get_type == Get::CellBatches)
         {
-            interface_batch.resize(args::batch_size);
-            comput_stencil_batch.resize(args::batch_size);
             interface_batch.reset_position();
             comput_stencil_batch.reset_position();
         }
@@ -311,6 +377,31 @@ namespace samurai
         //                                                                       opposite_direction,
         //                                                                       opposite_comput_stencil,
         //                                                                       std::forward<Func>(f));
+    }
+
+    template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Mesh, std::size_t comput_stencil_size, class Func>
+    void for_each_interior_interface__level_jump_opposite_direction(const Mesh& mesh,
+                                                                    std::size_t level,
+                                                                    const DirectionVector<Mesh::dim>& direction,
+                                                                    const Stencil<comput_stencil_size, Mesh::dim>& comput_stencil,
+                                                                    Func&& f)
+    {
+        using cell_t = typename Mesh::cell_t;
+
+        ArrayBatch<cell_t, 2> interface_batch;
+        ArrayBatch<cell_t, comput_stencil_size> comput_stencil_batch;
+        if constexpr (get_type == Get::CellBatches)
+        {
+            interface_batch.resize(args::batch_size);
+            comput_stencil_batch.resize(args::batch_size);
+        }
+        for_each_interior_interface__level_jump_opposite_direction<run_type, get_type>(mesh,
+                                                                                       level,
+                                                                                       direction,
+                                                                                       comput_stencil,
+                                                                                       interface_batch,
+                                                                                       comput_stencil_batch,
+                                                                                       std::forward<Func>(f));
     }
 
     /**
