@@ -51,7 +51,7 @@ namespace samurai
                     }
                     else if constexpr (get_type == Get::CellBatches)
                     {
-                        for (std::size_t i = 0; i < cell.size(); ++i)
+                        for (std::size_t i = 0; i < contrib.size(); ++i)
                         {
                             for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
                             {

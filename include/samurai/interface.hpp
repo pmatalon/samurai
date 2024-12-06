@@ -96,6 +96,8 @@ namespace samurai
         {
             interface_batch.resize(args::batch_size);
             comput_stencil_batch.resize(args::batch_size);
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(intersect,
@@ -117,8 +119,8 @@ namespace samurai
         {
             if (interface_batch.position() > 0)
             {
-                interface_batch.resize(interface_batch.position());
-                comput_stencil_batch.resize(interface_batch.position());
+                // interface_batch.resize(interface_batch.position());
+                // comput_stencil_batch.resize(interface_batch.position());
                 f(interface_batch, comput_stencil_batch);
             }
         }
@@ -182,6 +184,8 @@ namespace samurai
         {
             interface_batch.resize(args::batch_size);
             comput_stencil_batch.resize(args::batch_size);
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(fine_intersect,
@@ -203,8 +207,8 @@ namespace samurai
         {
             if (interface_batch.position() > 0)
             {
-                interface_batch.resize(interface_batch.position());
-                comput_stencil_batch.resize(interface_batch.position());
+                // interface_batch.resize(interface_batch.position());
+                // comput_stencil_batch.resize(interface_batch.position());
                 f(interface_batch, comput_stencil_batch);
             }
         }
@@ -272,6 +276,8 @@ namespace samurai
         {
             interface_batch.resize(args::batch_size);
             comput_stencil_batch.resize(args::batch_size);
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
         }
 
         for_each_meshinterval<mesh_interval_t, run_type>(fine_intersect,
@@ -293,8 +299,8 @@ namespace samurai
         {
             if (interface_batch.position() > 0)
             {
-                interface_batch.resize(interface_batch.position());
-                comput_stencil_batch.resize(interface_batch.position());
+                // interface_batch.resize(interface_batch.position());
+                // comput_stencil_batch.resize(interface_batch.position());
                 f(interface_batch, comput_stencil_batch);
             }
         }
