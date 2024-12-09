@@ -29,37 +29,44 @@ namespace samurai
         {
         }
 
-        void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const override
+        template <Get get_type, class CellType, class ContribType>
+        inline void add_cell_contrib_to_field(output_field_t& output_field, const CellType& cell, const ContribType& contrib) const
         {
-            constexpr Get get_type = Get::CellBatches;
+            if constexpr (get_type == Get::Cells)
+            {
+                for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
+                {
+#pragma omp atomic update
+                    field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
+                }
+            }
+            else if constexpr (get_type == Get::CellBatches)
+            {
+                for (std::size_t i = 0; i < contrib.size(); ++i)
+                {
+                    for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
+                    {
+#pragma omp atomic update
+                        field_value(output_field, cell[i], field_i) += this->scheme().flux_value_cmpnent(contrib[i], field_i);
+                    }
+                }
+            }
+        }
 
+      private:
+
+        template <Get get_type = Get::Cells>
+        void _apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const
+        {
             times::timers_interfaces.start("interior");
 
             // Interior interfaces
             scheme().template for_each_interior_interface<Run::Parallel, get_type>( // We need the 'template' keyword...
                 d,
                 input_field,
-                [&](const auto& cell, auto& contrib)
+                [&](const auto& cell, const auto& contrib)
                 {
-                    if constexpr (get_type == Get::Cells)
-                    {
-                        for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
-                        {
-#pragma omp atomic update
-                            field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
-                        }
-                    }
-                    else if constexpr (get_type == Get::CellBatches)
-                    {
-                        for (std::size_t i = 0; i < contrib.size(); ++i)
-                        {
-                            for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
-                            {
-#pragma omp atomic update
-                                field_value(output_field, cell[i], field_i) += this->scheme().flux_value_cmpnent(contrib[i], field_i);
-                            }
-                        }
-                    }
+                    add_cell_contrib_to_field<get_type>(output_field, cell, contrib);
                 });
 
             times::timers_interfaces.stop("interior");
@@ -72,15 +79,26 @@ namespace samurai
                 scheme().template for_each_boundary_interface<Run::Parallel>( // We need the 'template' keyword...
                     d,
                     input_field,
-                    [&](const auto& cell, auto& contrib)
+                    [&](const auto& cell, const auto& contrib)
                     {
-                        for (std::size_t field_i = 0; field_i < output_field_size; ++field_i)
-                        {
-                            field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
-                        }
+                        add_cell_contrib_to_field<Get::Cells>(output_field, cell, contrib);
                     });
             }
             times::timers_interfaces.stop("boundary");
+        }
+
+      public:
+
+        void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const override
+        {
+            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch)
+            {
+                _apply<Get::CellBatches>(d, output_field, input_field);
+            }
+            else
+            {
+                _apply<Get::Cells>(d, output_field, input_field);
+            }
         }
     };
 } // end namespace samurai

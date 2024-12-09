@@ -141,7 +141,6 @@ namespace samurai
 
                 weno5[d].create_temp_variables = []()
                 {
-                    // return StencilValuesBatch<cfg>();
                     return new TempVariables();
                 };
 
@@ -229,6 +228,7 @@ namespace samurai
 
         auto scheme = make_flux_based_scheme(weno5);
         scheme.set_name("convection");
+        // scheme.enable_batches(false);
         return scheme;
     }
 

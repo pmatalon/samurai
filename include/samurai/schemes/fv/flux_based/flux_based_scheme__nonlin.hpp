@@ -33,6 +33,7 @@ namespace samurai
 
         FluxDefinition<cfg> m_flux_definition;
         bool m_include_boundary_fluxes = true;
+        bool m_enable_batches          = true;
 
       public:
 
@@ -59,6 +60,16 @@ namespace samurai
         bool include_boundary_fluxes() const
         {
             return m_include_boundary_fluxes;
+        }
+
+        void enable_batches(bool enable)
+        {
+            m_enable_batches = enable;
+        }
+
+        bool enable_batches() const
+        {
+            return m_enable_batches;
         }
 
         inline auto h_factor(double h_face, double h_cell) const
