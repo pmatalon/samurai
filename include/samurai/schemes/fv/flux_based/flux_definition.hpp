@@ -68,12 +68,12 @@ namespace samurai
     template <class cfg>
     using StencilValuesBatch = ArrayBatch<typename cfg::input_field_t::value_type, cfg::stencil_size>;
 
-    // struct BatchInfo
-    // {
-    //     std::size_t size;
-    //     double cell_length;
-    //     std::size_t level;
-    // };
+    struct BatchData
+    {
+        std::size_t size;
+        double cell_length;
+        void* temp_variables;
+    };
 
     /**
      * Specialization of @class NormalFluxDefinition.
@@ -96,7 +96,7 @@ namespace samurai
         using flux_func             = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
         using cons_flux_func        = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
         using cons_flux_func__batch = std::function<
-            void(/*const BatchInfo&,*/ const stencil_cells_batch_t&, flux_values_batch_t&, temp_variables_t, const stencil_values_batch_t&)>; // conservative
+            void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
         using create_temp_variables_func = std::function<temp_variables_t()>;
 
         using jacobian_func      = std::function<StencilJacobianPair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative

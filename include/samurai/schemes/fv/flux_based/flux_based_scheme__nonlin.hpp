@@ -107,19 +107,25 @@ namespace samurai
             ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
             ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
             Batch<FluxValue<cfg>> flux_values;
+            BatchData batch_data;
             if constexpr (get_type == Get::CellBatches)
             {
                 interface_batch.resize(args::batch_size);
                 comput_stencil_batch.resize(args::batch_size);
                 stencil_values.resize(args::batch_size);
                 flux_values.resize(args::batch_size);
+                if (flux_def.create_temp_variables)
+                {
+                    batch_data.temp_variables = flux_def.create_temp_variables();
+                }
             }
-            void* temp_variables = flux_def.create_temp_variables();
 
             // Same level
             for (std::size_t level = min_level; level <= max_level; ++level)
             {
                 auto h = mesh.cell_length(level);
+
+                batch_data.cell_length = h;
 
                 for_each_interior_interface__same_level<run_type, get_type>(
                     mesh,
@@ -144,7 +150,8 @@ namespace samurai
                         }
                         else if constexpr (get_type == Get::CellBatches)
                         {
-                            flux_values.resize(interface_cells.size());
+                            batch_data.size = interface_cells.size();
+                            flux_values.resize(batch_data.size);
                             // times::timers_b.start("transform");
                             transform(comput_cells,
                                       stencil_values,
@@ -156,7 +163,7 @@ namespace samurai
                             // times::timers_b.stop("transform");
 
                             // times::timers_b.start("computation");
-                            flux_def.cons_flux_function__batch(comput_cells, flux_values, temp_variables, stencil_values);
+                            flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
                             auto factor = h_factor(h, h);
                             flux_values *= factor;
                             // times::timers_b.stop("computation");
@@ -178,6 +185,8 @@ namespace samurai
             {
                 auto h_l   = mesh.cell_length(level);
                 auto h_lp1 = mesh.cell_length(level + 1);
+
+                batch_data.cell_length = h_lp1;
 
                 //         |__|   l+1
                 //    |____|      l
@@ -207,7 +216,8 @@ namespace samurai
                             }
                             else if constexpr (get_type == Get::CellBatches)
                             {
-                                flux_values.resize(interface_cells.size());
+                                batch_data.size = interface_cells.size();
+                                flux_values.resize(batch_data.size);
                                 // times::timers_b.start("transform");
                                 transform(comput_cells,
                                           stencil_values,
@@ -218,7 +228,7 @@ namespace samurai
                                 // times::timers_b.stop("transform");
 
                                 // times::timers_b.start("computation");
-                                flux_def.cons_flux_function__batch(comput_cells, flux_values, temp_variables, stencil_values);
+                                flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
                                 auto left_factor = h_factor(h_lp1, h_l);
                                 flux_values *= left_factor;
                                 // times::timers_b.stop("computation");
@@ -263,7 +273,8 @@ namespace samurai
                             }
                             else if constexpr (get_type == Get::CellBatches)
                             {
-                                flux_values.resize(interface_cells.size());
+                                batch_data.size = interface_cells.size();
+                                flux_values.resize(batch_data.size);
                                 // times::timers_b.start("transform");
                                 transform(comput_cells,
                                           stencil_values,
@@ -274,7 +285,7 @@ namespace samurai
                                 // times::timers_b.stop("transform");
 
                                 // times::timers_b.start("computation");
-                                flux_def.cons_flux_function__batch(comput_cells, flux_values, temp_variables, stencil_values);
+                                flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
                                 auto left_factor = h_factor(h_lp1, h_lp1);
                                 flux_values *= left_factor;
                                 // times::timers_b.stop("computation");
