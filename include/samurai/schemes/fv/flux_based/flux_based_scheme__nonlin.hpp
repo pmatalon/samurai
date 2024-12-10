@@ -30,9 +30,20 @@ namespace samurai
         using cfg_t      = cfg;
         using bdry_cfg_t = bdry_cfg;
 
+        struct BatchMemory
+        {
+            ArrayBatch<cell_t, 2> interface_batch;
+            ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
+            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+            Batch<FluxValue<cfg>> flux_values;
+            BatchData batch_data;
+        };
+
       private:
 
         FluxDefinition<cfg> m_flux_definition;
+        BatchMemory m_batch_memory;
+
         bool m_include_boundary_fluxes = true;
         bool m_enable_batches          = true;
 
@@ -103,7 +114,7 @@ namespace samurai
          * in a specific direction and receive the contribution computed from the stencil.
          */
         template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Func>
-        void for_each_interior_interface(std::size_t d, input_field_t& field, Func&& apply_contrib) const
+        void for_each_interior_interface(std::size_t d, input_field_t& field, Func&& apply_contrib)
         {
             auto& mesh = field.mesh();
 
@@ -114,11 +125,11 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
-            ArrayBatch<cell_t, 2> interface_batch;
-            ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
-            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
-            Batch<FluxValue<cfg>> flux_values;
-            BatchData batch_data;
+            auto& interface_batch      = m_batch_memory.interface_batch;
+            auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
+            auto& stencil_values       = m_batch_memory.stencil_values;
+            auto& flux_values          = m_batch_memory.flux_values;
+            auto& batch_data           = m_batch_memory.batch_data;
             if constexpr (get_type == Get::CellBatches)
             {
                 interface_batch.resize(args::batch_size);
@@ -321,7 +332,7 @@ namespace samurai
          * in a specific direction and receive the contribution computed from the stencil.
          */
         template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Func>
-        void for_each_boundary_interface(std::size_t d, input_field_t& field, Func&& apply_contrib) const
+        void for_each_boundary_interface(std::size_t d, input_field_t& field, Func&& apply_contrib)
         {
             auto& mesh = field.mesh();
 
@@ -329,11 +340,11 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
-            ArrayBatch<cell_t, 2> interface_batch;
-            ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
-            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
-            Batch<FluxValue<cfg>> flux_values;
-            BatchData batch_data;
+            auto& interface_batch      = m_batch_memory.interface_batch;
+            auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
+            auto& stencil_values       = m_batch_memory.stencil_values;
+            auto& flux_values          = m_batch_memory.flux_values;
+            auto& batch_data           = m_batch_memory.batch_data;
             if constexpr (get_type == Get::CellBatches)
             {
                 interface_batch.resize(args::batch_size);
