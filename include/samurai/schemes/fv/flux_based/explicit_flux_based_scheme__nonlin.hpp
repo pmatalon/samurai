@@ -77,12 +77,12 @@ namespace samurai
             // Boundary interfaces
             if (scheme().include_boundary_fluxes())
             {
-                scheme().template for_each_boundary_interface<Run::Parallel>( // We need the 'template' keyword...
+                scheme().template for_each_boundary_interface<Run::Parallel, get_type>( // We need the 'template' keyword...
                     d,
                     input_field,
                     [&](const auto& cell, const auto& contrib)
                     {
-                        add_cell_contrib_to_field<Get::Cells>(output_field, cell, contrib);
+                        add_cell_contrib_to_field<get_type>(output_field, cell, contrib);
                     });
             }
             times::timers_interfaces.stop("boundary");

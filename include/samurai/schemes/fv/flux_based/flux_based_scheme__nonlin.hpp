@@ -320,7 +320,7 @@ namespace samurai
          * This function is used in the Explicit class to iterate over the boundary interfaces
          * in a specific direction and receive the contribution computed from the stencil.
          */
-        template <Run run_type = Run::Sequential, class Func>
+        template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Func>
         void for_each_boundary_interface(std::size_t d, input_field_t& field, Func&& apply_contrib) const
         {
             auto& mesh = field.mesh();
@@ -329,34 +329,112 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
+            ArrayBatch<cell_t, 2> interface_batch;
+            ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
+            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+            Batch<FluxValue<cfg>> flux_values;
+            BatchData batch_data;
+            if constexpr (get_type == Get::CellBatches)
+            {
+                interface_batch.resize(args::batch_size);
+                comput_stencil_batch.resize(args::batch_size);
+                stencil_values.resize(args::batch_size);
+                flux_values.resize(args::batch_size);
+                if (flux_def.create_temp_variables)
+                {
+                    batch_data.temp_variables = flux_def.create_temp_variables();
+                }
+            }
+
             for_each_level(mesh,
                            [&](auto level)
                            {
                                auto h = mesh.cell_length(level);
 
-                               // Boundary in direction
-                               for_each_boundary_interface__direction<run_type>(mesh,
-                                                                                level,
-                                                                                flux_def.direction,
-                                                                                flux_def.stencil,
-                                                                                [&](auto& cell, auto& comput_cells)
-                                                                                {
-                                                                                    auto flux_values  = flux_function(comput_cells, field);
-                                                                                    auto cell_contrib = contribution(flux_values[0], h, h);
-                                                                                    apply_contrib(cell, cell_contrib);
-                                                                                });
+                               batch_data.cell_length = h;
 
-                               // Boundary in opposite direction
-                               for_each_boundary_interface__opposite_direction<run_type>(
+                               // Boundary in direction
+                               for_each_boundary_interface__direction<run_type, get_type>(
                                    mesh,
                                    level,
                                    flux_def.direction,
                                    flux_def.stencil,
+                                   interface_batch,
+                                   comput_stencil_batch,
                                    [&](auto& cell, auto& comput_cells)
                                    {
-                                       auto flux_values  = flux_function(comput_cells, field);
-                                       auto cell_contrib = contribution(flux_values[1], h, h);
-                                       apply_contrib(cell, cell_contrib);
+                                       if constexpr (get_type == Get::Cells)
+                                       {
+                                           auto flux_values  = flux_function(comput_cells, field);
+                                           auto cell_contrib = contribution(flux_values[0], h, h);
+                                           apply_contrib(cell, cell_contrib);
+                                       }
+                                       else if constexpr (get_type == Get::CellBatches)
+                                       {
+                                           batch_data.size = comput_cells.size();
+                                           flux_values.resize(batch_data.size);
+                                           // times::timers_b.start("transform");
+                                           transform(comput_cells,
+                                                     stencil_values,
+                                                     [&](const auto& c)
+                                                     {
+                                                         return field[c];
+                                                     });
+
+                                           // times::timers_b.stop("transform");
+
+                                           // times::timers_b.start("computation");
+                                           flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
+                                           auto factor = h_factor(h, h);
+                                           flux_values *= factor;
+                                           // times::timers_b.stop("computation");
+                                           // times::timers_b.start("copy to field");
+
+                                           // static_assert(std::is_same_v<void, decltype(cell)>);
+                                           apply_contrib(cell, flux_values);
+                                           // times::timers_b.stop("copy to field");
+                                       }
+                                   });
+
+                               // Boundary in opposite direction
+                               for_each_boundary_interface__opposite_direction<run_type, get_type>(
+                                   mesh,
+                                   level,
+                                   flux_def.direction,
+                                   flux_def.stencil,
+                                   interface_batch,
+                                   comput_stencil_batch,
+                                   [&](auto& cell, auto& comput_cells)
+                                   {
+                                       if constexpr (get_type == Get::Cells)
+                                       {
+                                           auto flux_values  = flux_function(comput_cells, field);
+                                           auto cell_contrib = contribution(flux_values[1], h, h);
+                                           apply_contrib(cell, cell_contrib);
+                                       }
+                                       else if constexpr (get_type == Get::CellBatches)
+                                       {
+                                           batch_data.size = comput_cells.size();
+                                           flux_values.resize(batch_data.size);
+                                           // times::timers_b.start("transform");
+                                           transform(comput_cells,
+                                                     stencil_values,
+                                                     [&](const auto& c)
+                                                     {
+                                                         return field[c];
+                                                     });
+
+                                           // times::timers_b.stop("transform");
+
+                                           // times::timers_b.start("computation");
+                                           flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
+                                           auto factor = h_factor(h, h);
+                                           flux_values *= -factor;
+                                           // times::timers_b.stop("computation");
+                                           // times::timers_b.start("copy to field");
+                                           apply_contrib(cell, flux_values);
+                                           // times::timers_b.stop("copy to field");
+                                       }
                                    });
                            });
         }
