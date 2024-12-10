@@ -167,7 +167,7 @@ namespace samurai
         /**
          * Explicit application of the scheme
          */
-        auto operator()(input_field_t& input_field) const
+        auto operator()(input_field_t& input_field)
         {
             times::timers.start(name() + " operator");
             auto explicit_scheme = make_explicit(derived_cast());
@@ -176,7 +176,7 @@ namespace samurai
             return output_field;
         }
 
-        void apply(output_field_t& output_field, input_field_t& input_field) const
+        void apply(output_field_t& output_field, input_field_t& input_field)
         {
             times::timers.start(name() + " operator");
             auto explicit_scheme = make_explicit(derived_cast());
@@ -184,7 +184,7 @@ namespace samurai
             times::timers.stop(name() + " operator");
         }
 
-        auto operator()(std::size_t d, input_field_t& input_field) const
+        auto operator()(std::size_t d, input_field_t& input_field)
         {
             times::timers.start(name() + " operator");
             auto explicit_scheme = make_explicit(derived_cast());
@@ -193,7 +193,7 @@ namespace samurai
             return output_field;
         }
 
-        void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const
+        void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field)
         {
             times::timers.start(name() + " operator");
             auto explicit_scheme = make_explicit(derived_cast());

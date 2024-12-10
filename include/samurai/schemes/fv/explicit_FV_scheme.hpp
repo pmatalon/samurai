@@ -20,11 +20,11 @@ namespace samurai
 
       private:
 
-        const scheme_t* m_scheme = nullptr;
+        scheme_t* m_scheme = nullptr;
 
       public:
 
-        explicit ExplicitFVScheme(const scheme_t& scheme)
+        explicit ExplicitFVScheme(scheme_t& scheme)
             : m_scheme(&scheme)
         {
         }
@@ -33,7 +33,12 @@ namespace samurai
         {
         }
 
-        auto& scheme() const
+        auto& scheme()
+        {
+            return *m_scheme;
+        }
+
+        const auto& scheme() const
         {
             return *m_scheme;
         }
@@ -49,7 +54,7 @@ namespace samurai
 
       public:
 
-        auto apply_to(input_field_t& input_field) const
+        auto apply_to(input_field_t& input_field)
         {
             output_field_t output_field = create_output_field(input_field);
 
@@ -59,7 +64,7 @@ namespace samurai
             return output_field;
         }
 
-        auto apply_to(std::size_t d, input_field_t& input_field) const
+        auto apply_to(std::size_t d, input_field_t& input_field)
         {
             output_field_t output_field = create_output_field(input_field);
 
@@ -69,7 +74,7 @@ namespace samurai
             return output_field;
         }
 
-        virtual void apply(output_field_t& output_field, input_field_t& input_field) const
+        virtual void apply(output_field_t& output_field, input_field_t& input_field)
         {
             for (std::size_t d = 0; d < dim; ++d)
             {
@@ -77,7 +82,7 @@ namespace samurai
             }
         }
 
-        virtual void apply(std::size_t /* d */, output_field_t& /* output_field */, input_field_t& /* input_field */) const
+        virtual void apply(std::size_t /* d */, output_field_t& /* output_field */, input_field_t& /* input_field */)
         {
             std::cerr << "The scheme '" << scheme().name() << "' cannot be applied by direction." << std::endl;
             assert(false);

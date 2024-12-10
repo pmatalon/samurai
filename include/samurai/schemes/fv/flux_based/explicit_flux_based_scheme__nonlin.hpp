@@ -24,7 +24,7 @@ namespace samurai
 
         using base_class::apply;
 
-        explicit Explicit(const scheme_t& s)
+        explicit Explicit(scheme_t& s)
             : base_class(s)
         {
         }
@@ -56,7 +56,7 @@ namespace samurai
       private:
 
         template <Get get_type = Get::Cells>
-        void _apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const
+        void _apply(std::size_t d, output_field_t& output_field, input_field_t& input_field)
         {
             times::timers_interfaces.start("interior");
 
@@ -89,7 +89,7 @@ namespace samurai
 
       public:
 
-        void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) const override
+        void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) override
         {
             if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch)
             {
