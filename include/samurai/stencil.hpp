@@ -243,25 +243,13 @@ namespace samurai
     template <std::size_t dim>
     constexpr Stencil<dim, dim> positive_cartesian_directions()
     {
-        static_assert(dim >= 1 && dim <= 3, "positive_cartesian_directions() not implemented for this dimension");
-        // clang-format off
-        if constexpr (dim == 1)
+        Stencil<dim, dim> s;
+        s.fill(0);
+        for (std::size_t i = 0; i < dim; ++i)
         {
-            //     right
-            return {{1}};
+            s(i, i) = 1;
         }
-        else if constexpr (dim == 2)
-        {
-            //      right,   top
-            return {{1, 0}, {0, 1}};
-        }
-        else if constexpr (dim == 3)
-        {
-            //        right,     back,       top
-            return {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-        }
-        // clang-format on
-        return Stencil<dim, dim>();
+        return s;
     }
 
     /**
@@ -394,7 +382,9 @@ namespace samurai
     template <std::size_t dim>
     constexpr Stencil<1, dim> center_only_stencil()
     {
-        return star_stencil<dim, 0>();
+        Stencil<1, dim> s;
+        s.fill(0);
+        return s;
     }
 
     template <std::size_t dim, class Vector>
