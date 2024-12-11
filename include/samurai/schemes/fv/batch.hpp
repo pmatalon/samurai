@@ -12,7 +12,11 @@ namespace samurai
 
       private:
 
+        static constexpr std::size_t MAX_SIZE = 128;
+        // using dynamic_vector_t = AlgebraicArray<T, MAX_SIZE>;
+
         using dynamic_vector_t = StdVectorWrapper<T>;
+
         // using dynamic_vector_t = xt::xtensor<T, 1>;
 
         std::array<dynamic_vector_t, array_size> m_batch;
@@ -72,28 +76,6 @@ namespace samurai
             return m_batch[index_in_array];
         }
 
-        // inline void reserve(std::size_t batch_size)
-        // {
-        //     if constexpr (array_size == 1)
-        //     {
-        //         m_batch.reserve(batch_size);
-        //     }
-        //     else
-        //     {
-        //         for (std::size_t i = 0; i < array_size; ++i)
-        //         {
-        //             if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
-        //             {
-        //                 m_batch[i].data().reserve(batch_size);
-        //             }
-        //             else
-        //             {
-        //                 m_batch[i].reserve(batch_size);
-        //             }
-        //         }
-        //     }
-        // }
-
         inline void resize(std::size_t batch_size)
         {
             if constexpr (array_size == 1)
@@ -102,15 +84,18 @@ namespace samurai
             }
             else
             {
-                for (std::size_t i = 0; i < array_size; ++i)
+                if constexpr (!std::is_same_v<dynamic_vector_t, AlgebraicArray<T, MAX_SIZE>>)
                 {
-                    if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
+                    for (std::size_t i = 0; i < array_size; ++i)
                     {
-                        m_batch[i].resize({batch_size});
-                    }
-                    else
-                    {
-                        m_batch[i].resize(batch_size);
+                        if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
+                        {
+                            m_batch[i].resize({batch_size});
+                        }
+                        else
+                        {
+                            m_batch[i].resize(batch_size);
+                        }
                     }
                 }
             }
