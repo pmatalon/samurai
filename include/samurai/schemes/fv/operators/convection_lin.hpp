@@ -176,12 +176,57 @@ namespace samurai
                         // compute_weno5_flux__batch(flux_values, f, *tmp);
                         for (std::size_t i = 0; i < batch_data.size; ++i)
                         {
-                            Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[0][i],
-                                                        velocity(d) * stencil_values[1][i],
-                                                        velocity(d) * stencil_values[2][i],
-                                                        velocity(d) * stencil_values[3][i],
-                                                        velocity(d) * stencil_values[4][i]});
-                            compute_weno5_flux(flux_values[i], f);
+                            // Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[0][i],
+                            //                             velocity(d) * stencil_values[1][i],
+                            //                             velocity(d) * stencil_values[2][i],
+                            //                             velocity(d) * stencil_values[3][i],
+                            //                             velocity(d) * stencil_values[4][i]});
+                            // compute_weno5_flux(flux_values[i], f);
+
+                            // compute_weno5_flux_vecto(flux_values[i],
+                            //                          velocity(d) * stencil_values[0][i],
+                            //                          velocity(d) * stencil_values[1][i],
+                            //                          velocity(d) * stencil_values[2][i],
+                            //                          velocity(d) * stencil_values[3][i],
+                            //                          velocity(d) * stencil_values[4][i]);
+
+                            double f_jm2 = velocity(d) * stencil_values[0][i];
+                            double f_jm1 = velocity(d) * stencil_values[1][i];
+                            double f_j   = velocity(d) * stencil_values[2][i];
+                            double f_jp1 = velocity(d) * stencil_values[3][i];
+                            double f_jp2 = velocity(d) * stencil_values[4][i];
+
+                            const double eps = 1e-6;
+
+                            // clang-format off
+
+                            // (2.8) and Table I (r=3)
+                            auto q0 =  1./3. * f_jm2 - 7./6. * f_jm1 + 11./6. * f_j;
+                            auto q1 = -1./6. * f_jm1 + 5./6. * f_j   +  1./3. * f_jp1;
+                            auto q2 =  1./3. * f_j   + 5./6. * f_jp1 -  1./6. * f_jp2;
+
+                            // (3.2)-(3.4)
+                            auto IS0 = 13./12. * pow(f_jm2 - 2.*f_jm1 + f_j  , 2) + 1./4. * pow(   f_jm2 -4.*f_jm1 + 3.*f_j  , 2);
+                            auto IS1 = 13./12. * pow(f_jm1 - 2.*f_j   + f_jp1, 2) + 1./4. * pow(   f_jm1           -    f_jp1, 2);
+                            auto IS2 = 13./12. * pow(f_j   - 2.*f_jp1 + f_jp2, 2) + 1./4. * pow(3.*f_j   -4.*f_jp1 +    f_jp2, 2);
+
+                            // clang-format on
+
+                            // (2.16) and Table II (r=3)
+                            auto alpha0 = 0.1 / pow((eps + IS0), 2);
+                            auto alpha1 = 0.6 / pow((eps + IS1), 2);
+                            auto alpha2 = 0.3 / pow((eps + IS2), 2);
+
+                            // (2.15)
+                            auto sum_alphas = alpha0 + alpha1 + alpha2;
+                            auto omega0     = alpha0 / sum_alphas;
+                            auto omega1     = alpha1 / sum_alphas;
+                            auto omega2     = alpha2 / sum_alphas;
+
+                            // (2.10)
+                            // value_type flux = omega0 * q0 + omega1 * q1 + omega2 * q2;
+                            // return flux;
+                            flux_values[i] = omega0 * q0 + omega1 * q1 + omega2 * q2;
                         }
                     };
                 }
@@ -201,27 +246,74 @@ namespace samurai
                                                                      Batch<FluxValue<cfg>>& flux_values,
                                                                      const StencilValuesBatch<cfg>& stencil_values)
                     {
-                        // TempVariables* tmp = static_cast<TempVariables*>(ctx);
-                        // tmp->resize(stencil_values.size());
-                        // auto& f = tmp->f;
-                        // assert(stencil_values.size() > 0);
-                        // for (std::size_t i = 0; i < stencil_values.size(); ++i)
-                        // {
-                        //     f[0][i] = velocity(d) * stencil_values[5][i];
-                        //     f[1][i] = velocity(d) * stencil_values[4][i];
-                        //     f[2][i] = velocity(d) * stencil_values[3][i];
-                        //     f[3][i] = velocity(d) * stencil_values[2][i];
-                        //     f[4][i] = velocity(d) * stencil_values[1][i];
-                        // }
-                        // compute_weno5_flux__batch(flux_values, f, *tmp);
+                // TempVariables* tmp = static_cast<TempVariables*>(ctx);
+                // tmp->resize(stencil_values.size());
+                // auto& f = tmp->f;
+                // assert(stencil_values.size() > 0);
+                // for (std::size_t i = 0; i < stencil_values.size(); ++i)
+                // {
+                //     f[0][i] = velocity(d) * stencil_values[5][i];
+                //     f[1][i] = velocity(d) * stencil_values[4][i];
+                //     f[2][i] = velocity(d) * stencil_values[3][i];
+                //     f[3][i] = velocity(d) * stencil_values[2][i];
+                //     f[4][i] = velocity(d) * stencil_values[1][i];
+                // }
+                // compute_weno5_flux__batch(flux_values, f, *tmp);
+
+#pragma omp simd
                         for (std::size_t i = 0; i < batch_data.size; ++i)
                         {
-                            Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[5][i],
-                                                        velocity(d) * stencil_values[4][i],
-                                                        velocity(d) * stencil_values[3][i],
-                                                        velocity(d) * stencil_values[2][i],
-                                                        velocity(d) * stencil_values[1][i]});
-                            compute_weno5_flux(flux_values[i], f);
+                            // Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[5][i],
+                            //                             velocity(d) * stencil_values[4][i],
+                            //                             velocity(d) * stencil_values[3][i],
+                            //                             velocity(d) * stencil_values[2][i],
+                            //                             velocity(d) * stencil_values[1][i]});
+                            // compute_weno5_flux(flux_values[i], f);
+
+                            // compute_weno5_flux_vecto(flux_values[i],
+                            //                          velocity(d) * stencil_values[5][i],
+                            //                          velocity(d) * stencil_values[4][i],
+                            //                          velocity(d) * stencil_values[3][i],
+                            //                          velocity(d) * stencil_values[2][i],
+                            //                          velocity(d) * stencil_values[1][i]);
+
+                            double f_jm2 = velocity(d) * stencil_values[5][i];
+                            double f_jm1 = velocity(d) * stencil_values[4][i];
+                            double f_j   = velocity(d) * stencil_values[3][i];
+                            double f_jp1 = velocity(d) * stencil_values[2][i];
+                            double f_jp2 = velocity(d) * stencil_values[1][i];
+
+                            const double eps = 1e-6;
+
+                            // clang-format off
+
+                            // (2.8) and Table I (r=3)
+                            auto q0 =  1./3. * f_jm2 - 7./6. * f_jm1 + 11./6. * f_j;
+                            auto q1 = -1./6. * f_jm1 + 5./6. * f_j   +  1./3. * f_jp1;
+                            auto q2 =  1./3. * f_j   + 5./6. * f_jp1 -  1./6. * f_jp2;
+
+                            // (3.2)-(3.4)
+                            auto IS0 = 13./12. * pow(f_jm2 - 2.*f_jm1 + f_j  , 2) + 1./4. * pow(   f_jm2 -4.*f_jm1 + 3.*f_j  , 2);
+                            auto IS1 = 13./12. * pow(f_jm1 - 2.*f_j   + f_jp1, 2) + 1./4. * pow(   f_jm1           -    f_jp1, 2);
+                            auto IS2 = 13./12. * pow(f_j   - 2.*f_jp1 + f_jp2, 2) + 1./4. * pow(3.*f_j   -4.*f_jp1 +    f_jp2, 2);
+
+                            // clang-format on
+
+                            // (2.16) and Table II (r=3)
+                            auto alpha0 = 0.1 / pow((eps + IS0), 2);
+                            auto alpha1 = 0.6 / pow((eps + IS1), 2);
+                            auto alpha2 = 0.3 / pow((eps + IS2), 2);
+
+                            // (2.15)
+                            auto sum_alphas = alpha0 + alpha1 + alpha2;
+                            auto omega0     = alpha0 / sum_alphas;
+                            auto omega1     = alpha1 / sum_alphas;
+                            auto omega2     = alpha2 / sum_alphas;
+
+                            // (2.10)
+                            // value_type flux = omega0 * q0 + omega1 * q1 + omega2 * q2;
+                            // return flux;
+                            flux_values[i] = omega0 * q0 + omega1 * q1 + omega2 * q2;
                         }
                     };
                 }
