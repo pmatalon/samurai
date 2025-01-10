@@ -84,7 +84,7 @@ namespace samurai
             }
             else
             {
-                if constexpr (!std::is_same_v<dynamic_vector_t, AlgebraicArray<T, MAX_SIZE>>)
+                if constexpr (!std::is_same_v<dynamic_vector_t, StdArrayWrapper<T, MAX_SIZE>>)
                 {
                     for (std::size_t i = 0; i < array_size; ++i)
                     {
