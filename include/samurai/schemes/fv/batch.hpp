@@ -99,6 +99,7 @@ namespace samurai
                     }
                 }
             }
+            reset_position();
         }
 
         // inline void add(const CollapsStdArray<T, array_size>& values)
