@@ -92,6 +92,8 @@ namespace samurai
             return m_enable_batches;
         }
 
+      private:
+
         inline auto h_factor(double h_face, double h_cell) const
         {
             double face_measure = std::pow(h_face, dim - 1);
@@ -105,6 +107,8 @@ namespace samurai
             return h_factor(h_face, h_cell) * flux_value;
         }
 
+      public:
+
         inline field_value_type flux_value_cmpnent(const FluxValue<cfg>& flux_value, [[maybe_unused]] std::size_t field_i) const
         {
             if constexpr (output_field_size == 1)
@@ -116,6 +120,8 @@ namespace samurai
                 return flux_value(static_cast<flux_index_type>(field_i));
             }
         }
+
+      private:
 
         template <class Func>
         inline void
@@ -141,6 +147,8 @@ namespace samurai
             interface_batch.reset_position();
             comput_stencil_batch.reset_position();
         }
+
+      public:
 
         /**
          * This function is used in the Explicit class to iterate over the interior interfaces
@@ -378,10 +386,7 @@ namespace samurai
             auto& batch_data           = m_batch_memory.batch_data;
             if constexpr (get_type == Get::CellBatches)
             {
-                interface_batch.resize(args::batch_size);
-                comput_stencil_batch.resize(args::batch_size);
-                stencil_values.resize(args::batch_size);
-                flux_values.resize(args::batch_size);
+                m_batch_memory.resize(args::batch_size);
                 if (flux_def.create_temp_variables)
                 {
                     batch_data.temp_variables = flux_def.create_temp_variables();
