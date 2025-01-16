@@ -148,6 +148,28 @@ namespace samurai
             comput_stencil_batch.reset_position();
         }
 
+        template <class Func>
+        inline void call_flux_function_boundary__batch(const NormalFluxDefinition<cfg>& flux_def, double factor, Func&& apply_contrib)
+        {
+            auto& interface_batch      = m_batch_memory.interface_batch;
+            auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
+            auto& stencil_values       = m_batch_memory.stencil_values;
+            auto& flux_values          = m_batch_memory.flux_values;
+            auto& batch_data           = m_batch_memory.batch_data;
+
+            batch_data.size = interface_batch.position();
+            flux_values.resize(batch_data.size);
+
+            flux_def.cons_flux_function__batch(batch_data, comput_stencil_batch, flux_values, stencil_values);
+
+            flux_values *= factor;
+            apply_contrib(interface_batch[0], flux_values);
+
+            stencil_values.reset_position();
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
+        }
+
       public:
 
         /**
@@ -382,7 +404,6 @@ namespace samurai
             auto& interface_batch      = m_batch_memory.interface_batch;
             auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
             auto& stencil_values       = m_batch_memory.stencil_values;
-            auto& flux_values          = m_batch_memory.flux_values;
             auto& batch_data           = m_batch_memory.batch_data;
             if constexpr (get_type == Get::CellBatches)
             {
@@ -400,89 +421,155 @@ namespace samurai
 
                                batch_data.cell_length = h;
 
+                               auto factor = h_factor(h, h);
+
                                // Boundary in direction
-                               for_each_boundary_interface__direction<run_type, get_type>(
+                               for_each_boundary_interface__direction<run_type, Get::Intervals>(
                                    mesh,
                                    level,
                                    flux_def.direction,
                                    flux_def.stencil,
-                                   interface_batch,
-                                   comput_stencil_batch,
-                                   [&](auto& cell, auto& comput_cells)
+                                   [&](auto& interface_it, auto& comput_stencil_it)
                                    {
                                        if constexpr (get_type == Get::Cells)
                                        {
-                                           auto flux_values  = flux_function(comput_cells, field);
-                                           auto cell_contrib = contribution(flux_values[0], h, h);
-                                           apply_contrib(cell, cell_contrib);
+                                           for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
+                                           {
+                                               auto flux_values  = flux_function(comput_stencil_it.cells(), field);
+                                               auto cell_contrib = contribution(flux_values[0], h, h);
+                                               apply_contrib(interface_it.cells()[0], cell_contrib);
+
+                                               interface_it.move_next();
+                                               comput_stencil_it.move_next();
+                                           }
                                        }
                                        else if constexpr (get_type == Get::CellBatches)
                                        {
-                                           batch_data.size = comput_cells.size();
-                                           flux_values.resize(batch_data.size);
-                                           // times::timers_b.start("transform");
-                                           transform(comput_cells,
-                                                     stencil_values,
-                                                     [&](const auto& c)
-                                                     {
-                                                         return field[c];
-                                                     });
+                                           std::size_t to_process = comput_stencil_it.interval().size();
+                                           while (to_process > 0)
+                                           {
+                                               auto n = std::min(to_process, args::batch_size - interface_batch.position());
 
-                                           // times::timers_b.stop("transform");
+                                               // Copy field values
+                                               comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
 
-                                           // times::timers_b.start("computation");
-                                           flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
-                                           auto factor = h_factor(h, h);
-                                           flux_values *= factor;
-                                           // times::timers_b.stop("computation");
-                                           // times::timers_b.start("copy to field");
+                                               interface_it.copy_to_batch(n, interface_batch);
+                                               comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
 
-                                           // static_assert(std::is_same_v<void, decltype(cell)>);
-                                           apply_contrib(cell, flux_values);
-                                           // times::timers_b.stop("copy to field");
+                                               to_process -= n;
+                                               if (interface_batch.position() == args::batch_size)
+                                               {
+                                                   call_flux_function_boundary__batch(flux_def, factor, std::forward<Func>(apply_contrib));
+                                               }
+                                           }
                                        }
+                                       //    else if constexpr (get_type == Get::CellBatches)
+                                       //    {
+                                       //        batch_data.size = comput_cells.size();
+                                       //        flux_values.resize(batch_data.size);
+                                       //        // times::timers_b.start("transform");
+                                       //        transform(comput_cells,
+                                       //                  stencil_values,
+                                       //                  [&](const auto& c)
+                                       //                  {
+                                       //                      return field[c];
+                                       //                  });
+
+                                       //        // times::timers_b.stop("transform");
+
+                                       //        // times::timers_b.start("computation");
+                                       //        flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
+                                       //        auto factor = h_factor(h, h);
+                                       //        flux_values *= factor;
+                                       //        // times::timers_b.stop("computation");
+                                       //        // times::timers_b.start("copy to field");
+
+                                       //        // static_assert(std::is_same_v<void, decltype(cell)>);
+                                       //        apply_contrib(cell, flux_values);
+                                       //        // times::timers_b.stop("copy to field");
+                                       //    }
                                    });
+
+                               if constexpr (get_type == Get::CellBatches)
+                               {
+                                   if (interface_batch.position() > 0)
+                                   {
+                                       call_flux_function_boundary__batch(flux_def, factor, std::forward<Func>(apply_contrib));
+                                   }
+                               }
 
                                // Boundary in opposite direction
-                               for_each_boundary_interface__opposite_direction<run_type, get_type>(
+                               for_each_boundary_interface__opposite_direction<run_type, Get::Intervals>(
                                    mesh,
                                    level,
                                    flux_def.direction,
                                    flux_def.stencil,
-                                   interface_batch,
-                                   comput_stencil_batch,
-                                   [&](auto& cell, auto& comput_cells)
+                                   [&](auto& interface_it, auto& comput_stencil_it)
                                    {
                                        if constexpr (get_type == Get::Cells)
                                        {
-                                           auto flux_values  = flux_function(comput_cells, field);
-                                           auto cell_contrib = contribution(flux_values[1], h, h);
-                                           apply_contrib(cell, cell_contrib);
+                                           for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
+                                           {
+                                               auto flux_values  = flux_function(comput_stencil_it.cells(), field);
+                                               auto cell_contrib = contribution(flux_values[1], h, h);
+                                               apply_contrib(interface_it.cells()[0], cell_contrib);
+
+                                               interface_it.move_next();
+                                               comput_stencil_it.move_next();
+                                           }
                                        }
                                        else if constexpr (get_type == Get::CellBatches)
                                        {
-                                           batch_data.size = comput_cells.size();
-                                           flux_values.resize(batch_data.size);
-                                           // times::timers_b.start("transform");
-                                           transform(comput_cells,
-                                                     stencil_values,
-                                                     [&](const auto& c)
-                                                     {
-                                                         return field[c];
-                                                     });
+                                           std::size_t to_process = comput_stencil_it.interval().size();
+                                           while (to_process > 0)
+                                           {
+                                               auto n = std::min(to_process, args::batch_size - interface_batch.position());
 
-                                           // times::timers_b.stop("transform");
+                                               // Copy field values
+                                               comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
 
-                                           // times::timers_b.start("computation");
-                                           flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
-                                           auto factor = h_factor(h, h);
-                                           flux_values *= -factor;
-                                           // times::timers_b.stop("computation");
-                                           // times::timers_b.start("copy to field");
-                                           apply_contrib(cell, flux_values);
-                                           // times::timers_b.stop("copy to field");
+                                               interface_it.copy_to_batch(n, interface_batch);
+                                               comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
+
+                                               to_process -= n;
+                                               if (interface_batch.position() == args::batch_size)
+                                               {
+                                                   call_flux_function_boundary__batch(flux_def, -factor, std::forward<Func>(apply_contrib));
+                                               }
+                                           }
                                        }
+                                       //    else if constexpr (get_type == Get::CellBatches)
+                                       //    {
+                                       //        batch_data.size = comput_cells.size();
+                                       //        flux_values.resize(batch_data.size);
+                                       //        // times::timers_b.start("transform");
+                                       //        transform(comput_cells,
+                                       //                  stencil_values,
+                                       //                  [&](const auto& c)
+                                       //                  {
+                                       //                      return field[c];
+                                       //                  });
+
+                                       //        // times::timers_b.stop("transform");
+
+                                       //        // times::timers_b.start("computation");
+                                       //        flux_def.cons_flux_function__batch(batch_data, comput_cells, flux_values, stencil_values);
+                                       //        auto factor = h_factor(h, h);
+                                       //        flux_values *= -factor;
+                                       //        // times::timers_b.stop("computation");
+                                       //        // times::timers_b.start("copy to field");
+                                       //        apply_contrib(cell, flux_values);
+                                       //        // times::timers_b.stop("copy to field");
+                                       //    }
                                    });
+
+                               if constexpr (get_type == Get::CellBatches)
+                               {
+                                   if (interface_batch.position() > 0)
+                                   {
+                                       call_flux_function_boundary__batch(flux_def, -factor, std::forward<Func>(apply_contrib));
+                                   }
+                               }
                            });
         }
 
