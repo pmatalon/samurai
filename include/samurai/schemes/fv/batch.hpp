@@ -1,4 +1,5 @@
 #pragma once
+#include "../../stencil.hpp"
 #include "std_vector_wrapper.hpp"
 
 namespace samurai
@@ -155,18 +156,75 @@ namespace samurai
     template <class T>
     using Batch = StdVectorWrapper<T>;
 
-    template <class T1, class T2, std::size_t size, class Func>
-    void transform(const ArrayBatch<T1, size>& input, ArrayBatch<T2, size>& output, Func&& op)
+    // template <class T1, class T2, std::size_t size, class Func>
+    // void transform(const ArrayBatch<T1, size>& input, ArrayBatch<T2, size>& output, Func&& op)
+    // {
+    //     output.resize(input.size());
+    //     for (std::size_t i = 0; i < size; ++i)
+    //     {
+    //         for (std::size_t j = 0; j < input.position(); ++j)
+    //         {
+    //             output[i][j] = op(input[i][j]);
+    //         }
+    //     }
+    //     output.position() = input.position();
+    // }
+
+    template <class Mesh, std::size_t stencil_size, class Cell>
+    void copy_to_batch(IteratorStencil<Mesh, stencil_size>& stencil_it, std::size_t length, ArrayBatch<Cell, stencil_size>& stencil_batch)
     {
-        output.resize(input.size());
-        for (std::size_t i = 0; i < size; ++i)
+        using index_t = typename Cell::index_t;
+
+        auto start = stencil_batch.position();
+        for (std::size_t s = 0; s < stencil_size; ++s)
         {
-            for (std::size_t j = 0; j < input.position(); ++j)
+            for (std::size_t ii = 0; ii < length; ++ii)
             {
-                output[i][j] = op(input[i][j]);
+                // stencil_batch[s][start + ii].level      = m_cells[s].level;
+                stencil_batch[s][start + ii].index = stencil_it.cells()[s].index + static_cast<index_t>(ii);
+                // stencil_batch[s][start + ii].indices[0] = m_cells[s].indices[0] + static_cast<value_t>(ii);
             }
         }
-        output.position() = input.position();
+        stencil_batch.position() += length;
+        for (Cell& cell : stencil_it.cells())
+        {
+            cell.index += length;
+            cell.indices[0] += length;
+        }
+    }
+
+    template <std::size_t index_coarse_cell, class Mesh, std::size_t stencil_size, class Cell>
+    void
+    copy_to_batch(LevelJumpIterator<index_coarse_cell, Mesh, stencil_size>& stencil_it, std::size_t length, ArrayBatch<Cell, 2>& stencil_batch)
+    {
+        for (std::size_t ii = 0; ii < length; ++ii)
+        {
+            stencil_batch.add(stencil_it.cells(),
+                              [](Cell& dest, const Cell& src)
+                              {
+                                  dest.index = src.index;
+                                  // dest.indices = src.indices;
+                              });
+            stencil_it.move_next();
+        }
+    }
+
+    template <class Mesh, std::size_t stencil_size, class T, class Field>
+    void copy_values_to_batch(IteratorStencil<Mesh, stencil_size>& stencil_it,
+                              std::size_t length,
+                              ArrayBatch<T, stencil_size>& stencil_values_batch,
+                              const Field& field)
+    {
+        auto start = stencil_values_batch.position();
+        for (std::size_t s = 0; s < stencil_size; ++s)
+        {
+            for (std::size_t ii = 0; ii < length; ++ii)
+            {
+                stencil_values_batch[s][start + ii] = field[static_cast<std::size_t>(stencil_it.cells()[s].index) + ii];
+                assert(start + ii < 128);
+            }
+        }
+        stencil_values_batch.position() += length;
     }
 
 } // end namespace samurai

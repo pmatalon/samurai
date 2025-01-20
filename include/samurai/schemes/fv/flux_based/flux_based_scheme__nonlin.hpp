@@ -238,10 +238,10 @@ namespace samurai
                                 auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
 
                                 // Copy field values
-                                comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
+                                copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
 
-                                interface_it.copy_to_batch(n, interface_batch);
-                                comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
+                                copy_to_batch(interface_it, n, interface_batch);
+                                copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
 
                                 to_process -= n;
                                 if (interface_batch.position() == interface_batch.capacity())
@@ -306,10 +306,10 @@ namespace samurai
                                     auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
 
                                     // Copy field values
-                                    comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
+                                    copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
 
-                                    interface_it.copy_to_batch(n, interface_batch);
-                                    comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
+                                    copy_to_batch(interface_it, n, interface_batch);
+                                    copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
 
                                     to_process -= n;
                                     if (interface_batch.position() == interface_batch.capacity())
@@ -364,10 +364,10 @@ namespace samurai
                                     auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
 
                                     // Copy field values
-                                    comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
+                                    copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
 
-                                    interface_it.copy_to_batch(n, interface_batch);
-                                    comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
+                                    copy_to_batch(interface_it, n, interface_batch);
+                                    copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
 
                                     to_process -= n;
                                     if (interface_batch.position() == interface_batch.capacity())
@@ -451,10 +451,10 @@ namespace samurai
                                                auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
 
                                                // Copy field values
-                                               comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
+                                               copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
 
-                                               interface_it.copy_to_batch(n, interface_batch);
-                                               comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
+                                               copy_to_batch(interface_it, n, interface_batch);
+                                               copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
 
                                                to_process -= n;
                                                if (interface_batch.position() == interface_batch.capacity())
@@ -526,10 +526,10 @@ namespace samurai
                                                auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
 
                                                // Copy field values
-                                               comput_stencil_it.copy_values_to_batch(n, stencil_values, field);
+                                               copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
 
-                                               interface_it.copy_to_batch(n, interface_batch);
-                                               comput_stencil_it.copy_to_batch(n, comput_stencil_batch);
+                                               copy_to_batch(interface_it, n, interface_batch);
+                                               copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
 
                                                to_process -= n;
                                                if (interface_batch.position() == interface_batch.capacity())
