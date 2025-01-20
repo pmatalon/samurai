@@ -836,13 +836,14 @@ namespace samurai
         }
         else if (bc.get_value_type() == BCVType::function)
         {
-            assert(stencil.has_origin);
+            int origin_index = find_stencil_origin(stencil);
+            assert(origin_index >= 0);
             for_each_stencil(field.mesh(),
                              subset,
                              stencil,
                              [&](auto& cells)
                              {
-                                 auto& cell_in    = cells[stencil.origin_index];
+                                 auto& cell_in    = cells[static_cast<std::size_t>(origin_index)];
                                  auto face_coords = cell_in.face_center(direction);
                                  auto value       = bc.value(direction, cell_in, face_coords);
                                  apply_bc(field, cells, value);
