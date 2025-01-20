@@ -220,11 +220,11 @@ namespace samurai
                         {
                             for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                             {
-                                auto flux_values        = flux_function(comput_stencil_it.cells(), field);
-                                auto left_cell_contrib  = contribution(flux_values[0], h, h);
-                                auto right_cell_contrib = contribution(flux_values[1], h, h);
-                                apply_contrib(interface_it.cells()[0], left_cell_contrib);
-                                apply_contrib(interface_it.cells()[1], right_cell_contrib);
+                                auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                flux_values[0] *= factor; // left
+                                flux_values[1] *= factor; // right
+                                apply_contrib(interface_it.cells()[0], flux_values[0]);
+                                apply_contrib(interface_it.cells()[1], flux_values[1]);
 
                                 interface_it.move_next();
                                 comput_stencil_it.move_next();
@@ -288,11 +288,11 @@ namespace samurai
                             {
                                 for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                                 {
-                                    auto flux_values        = flux_function(comput_stencil_it.cells(), field);
-                                    auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_l);
-                                    auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_lp1);
-                                    apply_contrib(interface_it.cells()[0], left_cell_contrib);
-                                    apply_contrib(interface_it.cells()[1], right_cell_contrib);
+                                    auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                    flux_values[0] *= left_factor;
+                                    flux_values[1] *= right_factor;
+                                    apply_contrib(interface_it.cells()[0], flux_values[0]);
+                                    apply_contrib(interface_it.cells()[1], flux_values[1]);
 
                                     interface_it.move_next();
                                     comput_stencil_it.move_next();
@@ -346,11 +346,11 @@ namespace samurai
                             {
                                 for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                                 {
-                                    auto flux_values        = flux_function(comput_stencil_it.cells(), field);
-                                    auto left_cell_contrib  = contribution(flux_values[0], h_lp1, h_lp1);
-                                    auto right_cell_contrib = contribution(flux_values[1], h_lp1, h_l);
-                                    apply_contrib(interface_it.cells()[0], left_cell_contrib);
-                                    apply_contrib(interface_it.cells()[1], right_cell_contrib);
+                                    auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                    flux_values[0] *= left_factor;
+                                    flux_values[1] *= right_factor;
+                                    apply_contrib(interface_it.cells()[0], flux_values[0]);
+                                    apply_contrib(interface_it.cells()[1], flux_values[1]);
 
                                     interface_it.move_next();
                                     comput_stencil_it.move_next();
@@ -435,9 +435,9 @@ namespace samurai
                                        {
                                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                                            {
-                                               auto flux_values  = flux_function(comput_stencil_it.cells(), field);
-                                               auto cell_contrib = contribution(flux_values[0], h, h);
-                                               apply_contrib(interface_it.cells()[0], cell_contrib);
+                                               auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                               flux_values[0] *= factor;
+                                               apply_contrib(interface_it.cells()[0], flux_values[0]);
 
                                                interface_it.move_next();
                                                comput_stencil_it.move_next();
@@ -510,9 +510,9 @@ namespace samurai
                                        {
                                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                                            {
-                                               auto flux_values  = flux_function(comput_stencil_it.cells(), field);
-                                               auto cell_contrib = contribution(flux_values[1], h, h);
-                                               apply_contrib(interface_it.cells()[0], cell_contrib);
+                                               auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                               flux_values[1] *= factor;
+                                               apply_contrib(interface_it.cells()[0], flux_values[1]);
 
                                                interface_it.move_next();
                                                comput_stencil_it.move_next();

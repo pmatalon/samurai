@@ -221,7 +221,7 @@ namespace samurai
             for (std::size_t ii = 0; ii < length; ++ii)
             {
                 stencil_values_batch[s][start + ii] = field[static_cast<std::size_t>(stencil_it.cells()[s].index) + ii];
-                assert(start + ii < 128);
+                assert(start + ii < stencil_values_batch.capacity());
             }
         }
         stencil_values_batch.position() += length;
