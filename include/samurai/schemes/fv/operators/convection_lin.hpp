@@ -174,7 +174,7 @@ namespace samurai
                         //     f[4][i] = velocity(d) * stencil_values[4][i];
                         // }
                         // compute_weno5_flux__batch(flux_values, f, *tmp);
-                        for (std::size_t i = 0; i < batch_data.size; ++i)
+                        for (std::size_t i = 0; i < batch_data.batch_size; ++i)
                         {
                             // Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[0][i],
                             //                             velocity(d) * stencil_values[1][i],
@@ -261,7 +261,7 @@ namespace samurai
                 // compute_weno5_flux__batch(flux_values, f, *tmp);
 
 #pragma omp simd
-                        for (std::size_t i = 0; i < batch_data.size; ++i)
+                        for (std::size_t i = 0; i < batch_data.batch_size; ++i)
                         {
                             // Array<FluxValue<cfg>, 5> f({velocity(d) * stencil_values[5][i],
                             //                             velocity(d) * stencil_values[4][i],

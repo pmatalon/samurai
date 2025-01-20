@@ -70,7 +70,7 @@ namespace samurai
 
     struct BatchData
     {
-        std::size_t size;
+        std::size_t batch_size;
         double cell_length;
         void* temp_variables;
     };

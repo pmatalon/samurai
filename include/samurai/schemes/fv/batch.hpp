@@ -44,10 +44,13 @@ namespace samurai
             return m_batch;
         }
 
+        inline std::size_t capacity() const
+        {
+            return m_batch[0].size();
+        }
+
         inline std::size_t size() const
         {
-            // return m_batch[0].size();
-            //  return m_size;
             return m_position;
         }
 
