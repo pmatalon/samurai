@@ -170,6 +170,56 @@ namespace samurai
             comput_stencil_batch.reset_position();
         }
 
+        template <Get get_type = Get::Cells, class InterfaceIterator, class StencilIterator, class FluxFunction, class Func>
+        void process_interior_interfaces(InterfaceIterator& interface_it,
+                                         StencilIterator& comput_stencil_it,
+                                         const NormalFluxDefinition<cfg>& flux_def,
+                                         FluxFunction& flux_function,
+                                         input_field_t& field,
+                                         double left_factor,
+                                         double right_factor,
+                                         Func&& apply_contrib)
+        {
+            if constexpr (get_type == Get::Cells)
+            {
+                for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
+                {
+                    auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                    flux_values[0] *= left_factor;
+                    flux_values[1] *= right_factor;
+                    apply_contrib(interface_it.cells()[0], flux_values[0]);
+                    apply_contrib(interface_it.cells()[1], flux_values[1]);
+
+                    interface_it.move_next();
+                    comput_stencil_it.move_next();
+                }
+            }
+            else if constexpr (get_type == Get::CellBatches)
+            {
+                auto& interface_batch      = m_batch_memory.interface_batch;
+                auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
+                auto& stencil_values       = m_batch_memory.stencil_values;
+
+                std::size_t to_process = comput_stencil_it.interval().size();
+                while (to_process > 0)
+                {
+                    auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
+
+                    // Copy field values
+                    copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
+
+                    copy_to_batch(interface_it, n, interface_batch);
+                    copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
+
+                    to_process -= n;
+                    if (interface_batch.position() == interface_batch.capacity())
+                    {
+                        call_flux_function__batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+                    }
+                }
+            }
+        }
+
       public:
 
         /**
@@ -188,10 +238,8 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
-            auto& interface_batch      = m_batch_memory.interface_batch;
-            auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
-            auto& stencil_values       = m_batch_memory.stencil_values;
-            auto& batch_data           = m_batch_memory.batch_data;
+            auto& interface_batch = m_batch_memory.interface_batch;
+            auto& batch_data      = m_batch_memory.batch_data;
             if constexpr (get_type == Get::CellBatches)
             {
                 m_batch_memory.resize(args::batch_size);
@@ -209,48 +257,22 @@ namespace samurai
                 batch_data.cell_length = h;
                 auto factor            = h_factor(h, h);
 
-                for_each_interior_interface__same_level<run_type, Get::Intervals>(
-                    mesh,
-                    level,
-                    flux_def.direction,
-                    flux_def.stencil,
-                    [&](auto& interface_it, auto& comput_stencil_it)
-                    {
-                        if constexpr (get_type == Get::Cells)
-                        {
-                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                            {
-                                auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                flux_values[0] *= factor; // left
-                                flux_values[1] *= factor; // right
-                                apply_contrib(interface_it.cells()[0], flux_values[0]);
-                                apply_contrib(interface_it.cells()[1], flux_values[1]);
-
-                                interface_it.move_next();
-                                comput_stencil_it.move_next();
-                            }
-                        }
-                        else if constexpr (get_type == Get::CellBatches)
-                        {
-                            std::size_t to_process = comput_stencil_it.interval().size();
-                            while (to_process > 0)
-                            {
-                                auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
-
-                                // Copy field values
-                                copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
-
-                                copy_to_batch(interface_it, n, interface_batch);
-                                copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
-
-                                to_process -= n;
-                                if (interface_batch.position() == interface_batch.capacity())
-                                {
-                                    call_flux_function__batch(flux_def, factor, factor, std::forward<Func>(apply_contrib));
-                                }
-                            }
-                        }
-                    });
+                for_each_interior_interface__same_level<run_type, Get::Intervals>(mesh,
+                                                                                  level,
+                                                                                  flux_def.direction,
+                                                                                  flux_def.stencil,
+                                                                                  [&](auto& interface_it, auto& comput_stencil_it)
+                                                                                  {
+                                                                                      process_interior_interfaces<get_type>(
+                                                                                          interface_it,
+                                                                                          comput_stencil_it,
+                                                                                          flux_def,
+                                                                                          flux_function,
+                                                                                          field,
+                                                                                          factor,
+                                                                                          factor,
+                                                                                          std::forward<Func>(apply_contrib));
+                                                                                  });
 
                 if constexpr (get_type == Get::CellBatches)
                 {
@@ -284,40 +306,14 @@ namespace samurai
                         flux_def.stencil,
                         [&](auto& interface_it, auto& comput_stencil_it)
                         {
-                            if constexpr (get_type == Get::Cells)
-                            {
-                                for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                                {
-                                    auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                    flux_values[0] *= left_factor;
-                                    flux_values[1] *= right_factor;
-                                    apply_contrib(interface_it.cells()[0], flux_values[0]);
-                                    apply_contrib(interface_it.cells()[1], flux_values[1]);
-
-                                    interface_it.move_next();
-                                    comput_stencil_it.move_next();
-                                }
-                            }
-                            else if constexpr (get_type == Get::CellBatches)
-                            {
-                                std::size_t to_process = comput_stencil_it.interval().size();
-                                while (to_process > 0)
-                                {
-                                    auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
-
-                                    // Copy field values
-                                    copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
-
-                                    copy_to_batch(interface_it, n, interface_batch);
-                                    copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
-
-                                    to_process -= n;
-                                    if (interface_batch.position() == interface_batch.capacity())
-                                    {
-                                        call_flux_function__batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
-                                    }
-                                }
-                            }
+                            process_interior_interfaces<get_type>(interface_it,
+                                                                  comput_stencil_it,
+                                                                  flux_def,
+                                                                  flux_function,
+                                                                  field,
+                                                                  left_factor,
+                                                                  right_factor,
+                                                                  std::forward<Func>(apply_contrib));
                         });
                     if constexpr (get_type == Get::CellBatches)
                     {
@@ -342,40 +338,14 @@ namespace samurai
                         flux_def.stencil,
                         [&](auto& interface_it, auto& comput_stencil_it)
                         {
-                            if constexpr (get_type == Get::Cells)
-                            {
-                                for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                                {
-                                    auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                    flux_values[0] *= left_factor;
-                                    flux_values[1] *= right_factor;
-                                    apply_contrib(interface_it.cells()[0], flux_values[0]);
-                                    apply_contrib(interface_it.cells()[1], flux_values[1]);
-
-                                    interface_it.move_next();
-                                    comput_stencil_it.move_next();
-                                }
-                            }
-                            else if constexpr (get_type == Get::CellBatches)
-                            {
-                                std::size_t to_process = comput_stencil_it.interval().size();
-                                while (to_process > 0)
-                                {
-                                    auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
-
-                                    // Copy field values
-                                    copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
-
-                                    copy_to_batch(interface_it, n, interface_batch);
-                                    copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
-
-                                    to_process -= n;
-                                    if (interface_batch.position() == interface_batch.capacity())
-                                    {
-                                        call_flux_function__batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
-                                    }
-                                }
-                            }
+                            process_interior_interfaces<get_type>(interface_it,
+                                                                  comput_stencil_it,
+                                                                  flux_def,
+                                                                  flux_function,
+                                                                  field,
+                                                                  left_factor,
+                                                                  right_factor,
+                                                                  std::forward<Func>(apply_contrib));
                         });
                     if constexpr (get_type == Get::CellBatches)
                     {
