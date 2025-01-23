@@ -193,6 +193,11 @@ namespace samurai
                 return data;
             }
 
+            inline auto operator()(index_t start, index_t end, interval_value_t step)
+            {
+                return view(m_storage, {start, end, step});
+            }
+
             void resize()
             {
                 m_storage.resize(static_cast<size_type>(this->derived_cast().mesh().nb_cells()));

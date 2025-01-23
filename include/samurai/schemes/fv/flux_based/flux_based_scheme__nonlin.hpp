@@ -27,16 +27,21 @@ namespace samurai
 
         using cell_t = typename mesh_t::cell_t;
 
+        using index_t           = typename mesh_t::interval_t::index_t;
+        using field_data_view_t = typename NormalFluxDefinition<cfg>::field_data_view_t;
+
         using cfg_t      = cfg;
         using bdry_cfg_t = bdry_cfg;
 
         struct BatchMemory
         {
+            // Input
+            BatchData batch_data;
             ArrayBatch<cell_t, 2> interface_batch;
             ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
             ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+            // Output
             Batch<FluxValue<cfg>> flux_values;
-            BatchData batch_data;
 
             void resize(std::size_t size)
             {
@@ -47,10 +52,32 @@ namespace samurai
             }
         };
 
+        struct IntervalBatchMemory
+        {
+            // Input
+            BatchData batch_data;
+            ArrayBatch<cell_t, 2> interface_batch;
+            ArrayBatch<cell_t, cfg::stencil_size> comput_stencil_batch;
+            // std::array<field_data_view_t, cfg::stencil_size> data_views;
+            std::vector<field_data_view_t> stencil_values;
+
+            // Output
+            Batch<FluxValue<cfg>> flux_values;
+
+            void resize(std::size_t size)
+            {
+                interface_batch.resize(size);
+                comput_stencil_batch.resize(size);
+                flux_values.resize(size);
+                stencil_values.reserve(cfg::stencil_size);
+            }
+        };
+
       private:
 
         FluxDefinition<cfg> m_flux_definition;
         BatchMemory m_batch_memory;
+        IntervalBatchMemory m_interval_batch_memory;
 
         bool m_include_boundary_fluxes = true;
         bool m_enable_batches          = true;
@@ -136,7 +163,9 @@ namespace samurai
             batch_data.batch_size = interface_batch.position();
             flux_values.resize(batch_data.batch_size);
 
+            // times::timers_b.start("Flux computation");
             flux_def.cons_flux_function__batch(batch_data, comput_stencil_batch, flux_values, stencil_values);
+            // times::timers_b.stop("Flux computation");
 
             flux_values *= left_factor;
             apply_contrib(interface_batch[0], flux_values);
@@ -170,6 +199,34 @@ namespace samurai
             comput_stencil_batch.reset_position();
         }
 
+        template <class Func>
+        inline void call_flux_function__interval_batch(const NormalFluxDefinition<cfg>& flux_def,
+                                                       double left_factor,
+                                                       double right_factor,
+                                                       Func&& apply_contrib)
+        {
+            auto& interface_batch      = m_interval_batch_memory.interface_batch;
+            auto& comput_stencil_batch = m_interval_batch_memory.comput_stencil_batch;
+            auto& stencil_values       = m_interval_batch_memory.stencil_values;
+            auto& flux_values          = m_interval_batch_memory.flux_values;
+            auto& batch_data           = m_interval_batch_memory.batch_data;
+
+            batch_data.batch_size = interface_batch.position();
+            flux_values.resize(batch_data.batch_size);
+
+            // times::timers_b.start("Flux computation");
+            flux_def.cons_flux_function__interval_batch(batch_data, comput_stencil_batch, flux_values, stencil_values);
+            // times::timers_b.stop("Flux computation");
+
+            flux_values *= left_factor;
+            apply_contrib(interface_batch[0], flux_values);
+            flux_values *= -1. / left_factor * right_factor; // add minus sign, cancel left factor and apply right one
+            apply_contrib(interface_batch[1], flux_values);
+
+            interface_batch.reset_position();
+            comput_stencil_batch.reset_position();
+        }
+
         template <Get get_type = Get::Cells, class InterfaceIterator, class StencilIterator, class FluxFunction, class Func>
         void process_interior_interfaces(InterfaceIterator& interface_it,
                                          StencilIterator& comput_stencil_it,
@@ -194,6 +251,40 @@ namespace samurai
                     comput_stencil_it.move_next();
                 }
             }
+            else if constexpr (get_type == Get::Intervals)
+            {
+                auto& interface_batch      = m_interval_batch_memory.interface_batch;
+                auto& comput_stencil_batch = m_interval_batch_memory.comput_stencil_batch;
+                auto& stencil_values       = m_interval_batch_memory.stencil_values;
+
+                auto interval_size = comput_stencil_it.interval().size();
+                // times::timers_b.start("resize");
+                if (interval_size > interface_batch.capacity())
+                {
+                    m_interval_batch_memory.resize(interval_size);
+                }
+                interface_batch.reset_position();
+                comput_stencil_batch.reset_position();
+                // times::timers_b.stop("resize");
+
+                stencil_values.clear();
+
+                // Views to field values
+                auto interval_step = comput_stencil_it.interval().step;
+                // times::timers_b.start("Views");
+                for (std::size_t s = 0; s < cfg::stencil_size; ++s)
+                {
+                    auto start = comput_stencil_it.cells()[s].index;
+                    auto end   = start + static_cast<index_t>(interval_size);
+                    stencil_values.emplace_back(field(start, end, interval_step));
+                }
+                // times::timers_b.stop("Views");
+
+                copy_to_batch(interface_it, interval_size, interface_batch);
+                copy_to_batch(comput_stencil_it, interval_size, comput_stencil_batch);
+
+                call_flux_function__interval_batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+            }
             else if constexpr (get_type == Get::CellBatches)
             {
                 auto& interface_batch      = m_batch_memory.interface_batch;
@@ -206,7 +297,9 @@ namespace samurai
                     auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
 
                     // Copy field values
+                    // times::timers_b.start("Copies");
                     copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
+                    // times::timers_b.stop("Copies");
 
                     copy_to_batch(interface_it, n, interface_batch);
                     copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
@@ -248,6 +341,8 @@ namespace samurai
                     batch_data.temp_variables = flux_def.create_temp_variables();
                 }
             }
+
+            m_interval_batch_memory.resize(args::batch_size);
 
             // Same level
             for (std::size_t level = min_level; level <= max_level; ++level)

@@ -10,15 +10,14 @@ namespace samurai
       public:
 
         using value_type = T;
+        // using dynamic_vector_t = StdVectorWrapper<T>;
+        using dynamic_vector_t = field_data_storage_t<T, 1>;
+        //  using dynamic_vector_t = xt::xtensor<T, 1>;
 
       private:
 
         static constexpr std::size_t MAX_SIZE = 128;
         // using dynamic_vector_t = AlgebraicArray<T, MAX_SIZE>;
-
-        using dynamic_vector_t = StdVectorWrapper<T>;
-
-        // using dynamic_vector_t = xt::xtensor<T, 1>;
 
         std::array<dynamic_vector_t, array_size> m_batch;
 
@@ -75,10 +74,22 @@ namespace samurai
             return m_batch[index_in_array];
         }
 
+        // inline auto operator[](std::size_t index_in_array)
+        // {
+        //     range_t<long long> range{0, static_cast<long long>(capacity() - 1)};
+        //     return samurai::view(m_batch[index_in_array], range);
+        // }
+
         inline const auto& operator[](std::size_t index_in_array) const
         {
             return m_batch[index_in_array];
         }
+
+        // inline auto operator[](std::size_t index_in_array) const
+        // {
+        //     range_t<long long> range{0, static_cast<long long>(capacity() - 1)};
+        //     return samurai::view(m_batch[index_in_array], range);
+        // }
 
         inline void resize(std::size_t batch_size)
         {
@@ -92,14 +103,14 @@ namespace samurai
                 {
                     for (std::size_t i = 0; i < array_size; ++i)
                     {
-                        if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
-                        {
-                            m_batch[i].resize({batch_size});
-                        }
-                        else
-                        {
-                            m_batch[i].resize(batch_size);
-                        }
+                        // if constexpr (std::is_same_v<dynamic_vector_t, xt::xtensor<T, 1>>)
+                        // {
+                        //     m_batch[i].resize({batch_size});
+                        // }
+                        // else
+                        // {
+                        m_batch[i].resize(batch_size);
+                        //}
                     }
                 }
             }
@@ -215,13 +226,15 @@ namespace samurai
                               ArrayBatch<T, stencil_size>& stencil_values_batch,
                               const Field& field)
     {
+        static_assert(Field::size == 1);
+
         auto start = stencil_values_batch.position();
+        assert(start + length <= stencil_values_batch.capacity());
         for (std::size_t s = 0; s < stencil_size; ++s)
         {
             for (std::size_t ii = 0; ii < length; ++ii)
             {
                 stencil_values_batch[s][start + ii] = field[static_cast<std::size_t>(stencil_it.cells()[s].index) + ii];
-                assert(start + ii < stencil_values_batch.capacity());
             }
         }
         stencil_values_batch.position() += length;

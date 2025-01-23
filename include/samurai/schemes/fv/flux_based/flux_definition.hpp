@@ -85,18 +85,27 @@ namespace samurai
         using field_t = typename cfg::input_field_t;
         using cell_t  = typename field_t::cell_t;
 
-        using stencil_cells_t        = StencilCells<cfg>;
-        using stencil_cells_batch_t  = ArrayBatch<cell_t, cfg::stencil_size>;
-        using stencil_values_batch_t = StencilValuesBatch<cfg>; // ArrayBatch<typename field_t::value_type, cfg::stencil_size>;
-        using flux_values_batch_t    = Batch<FluxValue<cfg>>;
+        using field_data_view_t = decltype(std::declval<field_t>()(
+            std::declval<std::size_t>(),
+            std::declval<typename field_t::interval_t>(),
+            std::declval<xt::xtensor_fixed<typename field_t::interval_value_t, xt::xshape<field_t::dim - 1>>>()));
+
+        using stencil_cells_t                 = StencilCells<cfg>;
+        using stencil_cells_batch_t           = ArrayBatch<cell_t, cfg::stencil_size>;
+        using stencil_values_batch_t          = StencilValuesBatch<cfg>; // ArrayBatch<typename field_t::value_type, cfg::stencil_size>;
+        using stencil_values_interval_batch_t = std::vector<field_data_view_t>;
+        using flux_values_batch_t             = Batch<FluxValue<cfg>>;
 
         // using context_t = StencilValuesBatch<cfg>;
         using temp_variables_t = void*;
 
-        using flux_func             = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
-        using cons_flux_func        = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
+        using flux_func = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
+
+        using cons_flux_func        = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>; // conservative
         using cons_flux_func__batch = std::function<
             void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
+        using cons_flux_func__interval_batch = std::function<
+            void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_interval_batch_t&)>; // conservative
         using create_temp_variables_func = std::function<temp_variables_t()>;
 
         using jacobian_func      = std::function<StencilJacobianPair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
@@ -112,8 +121,9 @@ namespace samurai
          * Conservative flux function:
          * @returns the flux in the positive direction.
          */
-        cons_flux_func__batch cons_flux_function__batch  = nullptr;
-        create_temp_variables_func create_temp_variables = nullptr;
+        cons_flux_func__batch cons_flux_function__batch                   = nullptr;
+        cons_flux_func__interval_batch cons_flux_function__interval_batch = nullptr;
+        create_temp_variables_func create_temp_variables                  = nullptr;
 
         /**
          * Non-conservative flux function:

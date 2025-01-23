@@ -41,7 +41,7 @@ namespace samurai
                     field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
                 }
             }
-            else if constexpr (get_type == Get::CellBatches)
+            else if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
             {
                 for (std::size_t i = 0; i < contrib.size(); ++i)
                 {
@@ -92,7 +92,11 @@ namespace samurai
 
         void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) override
         {
-            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch)
+            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__interval_batch)
+            {
+                _apply<Get::Intervals>(d, output_field, input_field);
+            }
+            else if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch)
             {
                 _apply<Get::CellBatches>(d, output_field, input_field);
             }

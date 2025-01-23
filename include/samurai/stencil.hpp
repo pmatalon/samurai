@@ -499,6 +499,9 @@ namespace samurai
         const StencilAnalyzer<stencil_size, dim>& m_stencil_analyzer;
         std::array<cell_t, stencil_size> m_cells;
 
+        std::array<cell_t, stencil_size> m_cells;
+        std::array<mesh_interval_t, stencil_size> m_mesh_intervals;
+
       public:
 
         IteratorStencil(const Mesh& mesh, const StencilAnalyzer<stencil_size, dim>& stencil_analyzer)
@@ -524,6 +527,10 @@ namespace samurai
                 {
                     cell.level  = origin_mesh_interval.level;
                     cell.length = length;
+                }
+                for (mesh_interval_t& mi : m_mesh_intervals)
+                {
+                    mi = origin_mesh_interval.level;
                 }
             }
             m_mesh_interval = &origin_mesh_interval;
@@ -587,6 +594,13 @@ namespace samurai
                         }
 #endif
                     }
+                }
+
+                mesh_interval_t& mi = m_mesh_intervals[i];
+                mi.i += m_stencil(i, 0);
+                for (unsigned int k = 1; k < dim; ++k)
+                {
+                    mi.index[k] += m_stencil(i, k);
                 }
             }
 
