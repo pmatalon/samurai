@@ -502,6 +502,9 @@ namespace samurai
         {
             auto& mesh = field.mesh();
 
+            auto min_level = mesh[mesh_id_t::cells].min_level();
+            auto max_level = mesh[mesh_id_t::cells].max_level();
+
             auto& flux_def = flux_definition()[d];
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
@@ -516,120 +519,119 @@ namespace samurai
                 }
             }
 
-            for_each_level(mesh,
-                           [&](auto level)
-                           {
-                               auto h = mesh.cell_length(level);
+            for (std::size_t level = min_level; level <= max_level; ++level)
+            {
+                auto h = mesh.cell_length(level);
 
-                               m_batch_by_copies.batch_data.cell_length = h;
-                               m_batch_by_views.batch_data.cell_length  = h;
+                m_batch_by_copies.batch_data.cell_length = h;
+                m_batch_by_views.batch_data.cell_length  = h;
 
-                               auto factor = h_factor(h, h);
+                auto factor = h_factor(h, h);
 
-                               // Boundary in direction
-                               for_each_boundary_interface__direction<run_type, Get::Intervals>(
-                                   mesh,
-                                   level,
-                                   flux_def.direction,
-                                   flux_def.stencil,
-                                   [&](auto& interface_it, auto& comput_stencil_it)
-                                   {
-                                       if constexpr (get_type == Get::Cells)
-                                       {
-                                           for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                                           {
-                                               auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                               flux_values[0] *= factor;
-                                               apply_contrib(interface_it.cells()[0], flux_values[0]);
+                // Boundary in direction
+                for_each_boundary_interface__direction<run_type, Get::Intervals>(
+                    mesh,
+                    level,
+                    flux_def.direction,
+                    flux_def.stencil,
+                    [&](auto& interface_it, auto& comput_stencil_it)
+                    {
+                        if constexpr (get_type == Get::Cells)
+                        {
+                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
+                            {
+                                auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                flux_values[0] *= factor;
+                                apply_contrib(interface_it.cells()[0], flux_values[0]);
 
-                                               interface_it.move_next();
-                                               comput_stencil_it.move_next();
-                                           }
-                                       }
-                                       else if constexpr (get_type == Get::CellBatches)
-                                       {
-                                           auto& b = m_batch_by_copies;
+                                interface_it.move_next();
+                                comput_stencil_it.move_next();
+                            }
+                        }
+                        else if constexpr (get_type == Get::CellBatches)
+                        {
+                            auto& b = m_batch_by_copies;
 
-                                           std::size_t to_process = comput_stencil_it.interval().size();
-                                           while (to_process > 0)
-                                           {
-                                               auto n = std::min(to_process, b.remaining_size());
+                            std::size_t to_process = comput_stencil_it.interval().size();
+                            while (to_process > 0)
+                            {
+                                auto n = std::min(to_process, b.remaining_size());
 
-                                               // Copy field values
-                                               copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
+                                // Copy field values
+                                copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
 
-                                               copy_to_batch(interface_it, n, b.interfaces);
-                                               copy_to_batch(comput_stencil_it, n, b.comput_stencils);
+                                copy_to_batch(interface_it, n, b.interfaces);
+                                copy_to_batch(comput_stencil_it, n, b.comput_stencils);
 
-                                               to_process -= n;
-                                               if (b.is_full())
-                                               {
-                                                   call_flux_function_boundary__batch(flux_def, factor, std::forward<Func>(apply_contrib));
-                                               }
-                                           }
-                                       }
-                                   });
+                                to_process -= n;
+                                if (b.is_full())
+                                {
+                                    call_flux_function_boundary__batch(flux_def, factor, std::forward<Func>(apply_contrib));
+                                }
+                            }
+                        }
+                    });
 
-                               if constexpr (get_type == Get::CellBatches)
-                               {
-                                   if (!m_batch_by_copies.is_empty())
-                                   {
-                                       call_flux_function_boundary__batch(flux_def, factor, std::forward<Func>(apply_contrib));
-                                   }
-                               }
+                if constexpr (get_type == Get::CellBatches)
+                {
+                    if (!m_batch_by_copies.is_empty())
+                    {
+                        call_flux_function_boundary__batch(flux_def, factor, std::forward<Func>(apply_contrib));
+                    }
+                }
 
-                               // Boundary in opposite direction
-                               for_each_boundary_interface__opposite_direction<run_type, Get::Intervals>(
-                                   mesh,
-                                   level,
-                                   flux_def.direction,
-                                   flux_def.stencil,
-                                   [&](auto& interface_it, auto& comput_stencil_it)
-                                   {
-                                       if constexpr (get_type == Get::Cells)
-                                       {
-                                           for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                                           {
-                                               auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                               flux_values[1] *= factor;
-                                               apply_contrib(interface_it.cells()[0], flux_values[1]);
+                // Boundary in opposite direction
+                for_each_boundary_interface__opposite_direction<run_type, Get::Intervals>(
+                    mesh,
+                    level,
+                    flux_def.direction,
+                    flux_def.stencil,
+                    [&](auto& interface_it, auto& comput_stencil_it)
+                    {
+                        if constexpr (get_type == Get::Cells)
+                        {
+                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
+                            {
+                                auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                                flux_values[1] *= factor;
+                                apply_contrib(interface_it.cells()[0], flux_values[1]);
 
-                                               interface_it.move_next();
-                                               comput_stencil_it.move_next();
-                                           }
-                                       }
-                                       else if constexpr (get_type == Get::CellBatches)
-                                       {
-                                           auto& b = m_batch_by_copies;
+                                interface_it.move_next();
+                                comput_stencil_it.move_next();
+                            }
+                        }
+                        else if constexpr (get_type == Get::CellBatches)
+                        {
+                            auto& b = m_batch_by_copies;
 
-                                           std::size_t to_process = comput_stencil_it.interval().size();
-                                           while (to_process > 0)
-                                           {
-                                               auto n = std::min(to_process, b.remaining_size());
+                            std::size_t to_process = comput_stencil_it.interval().size();
+                            while (to_process > 0)
+                            {
+                                auto n = std::min(to_process, b.remaining_size());
 
-                                               // Copy field values
-                                               copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
+                                // Copy field values
+                                copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
 
-                                               copy_to_batch(interface_it, n, b.interfaces);
-                                               copy_to_batch(comput_stencil_it, n, b.comput_stencils);
+                                copy_to_batch(interface_it, n, b.interfaces);
+                                copy_to_batch(comput_stencil_it, n, b.comput_stencils);
 
-                                               to_process -= n;
-                                               if (b.is_full())
-                                               {
-                                                   call_flux_function_boundary__batch(flux_def, -factor, std::forward<Func>(apply_contrib));
-                                               }
-                                           }
-                                       }
-                                   });
+                                to_process -= n;
+                                if (b.is_full())
+                                {
+                                    call_flux_function_boundary__batch(flux_def, -factor, std::forward<Func>(apply_contrib));
+                                }
+                            }
+                        }
+                    });
 
-                               if constexpr (get_type == Get::CellBatches)
-                               {
-                                   if (!m_batch_by_copies.is_empty())
-                                   {
-                                       call_flux_function_boundary__batch(flux_def, -factor, std::forward<Func>(apply_contrib));
-                                   }
-                               }
-                           });
+                if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+                {
+                    if (!m_batch_by_copies.is_empty())
+                    {
+                        call_flux_function_boundary__batch(flux_def, -factor, std::forward<Func>(apply_contrib));
+                    }
+                }
+            }
         }
 
         /**
