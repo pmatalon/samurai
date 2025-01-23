@@ -99,31 +99,35 @@ namespace samurai
         // using context_t = StencilValuesBatch<cfg>;
         using temp_variables_t = void*;
 
-        using flux_func = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
+        //--------------------------//
+        // User function signatures //
+        //--------------------------//
 
-        using cons_flux_func        = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>; // conservative
+        // ------ Fluxes computed 1 by 1
+        using flux_func      = std::function<FluxValuePair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
+        using cons_flux_func = std::function<FluxValue<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
+
+        using jacobian_func      = std::function<StencilJacobianPair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
+        using cons_jacobian_func = std::function<StencilJacobian<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
+
+        // ------ Fluxes computed by batches
         using cons_flux_func__batch = std::function<
             void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
         using cons_flux_func__interval_batch = std::function<
             void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_interval_batch_t&)>; // conservative
         using create_temp_variables_func = std::function<temp_variables_t()>;
 
-        using jacobian_func      = std::function<StencilJacobianPair<cfg>(stencil_cells_t&, const field_t&)>; // non-conservative
-        using cons_jacobian_func = std::function<StencilJacobian<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
+        //-----------------------//
+        // Stored user functions //
+        //-----------------------//
+
+        // ------ Fluxes computed 1 by 1
 
         /**
          * Conservative flux function:
          * @returns the flux in the positive direction.
          */
         cons_flux_func cons_flux_function = nullptr;
-
-        /**
-         * Conservative flux function:
-         * @returns the flux in the positive direction.
-         */
-        cons_flux_func__batch cons_flux_function__batch                   = nullptr;
-        cons_flux_func__interval_batch cons_flux_function__interval_batch = nullptr;
-        create_temp_variables_func create_temp_variables                  = nullptr;
 
         /**
          * Non-conservative flux function:
@@ -134,6 +138,23 @@ namespace samurai
 
         cons_jacobian_func cons_jacobian_function = nullptr;
         jacobian_func jacobian_function           = nullptr;
+
+        // ------ Fluxes computed by batches
+
+        cons_flux_func__batch cons_flux_function__batch                   = nullptr;
+        cons_flux_func__interval_batch cons_flux_function__interval_batch = nullptr;
+        create_temp_variables_func create_temp_variables                  = nullptr;
+
+        template <class Func>
+        void set_cons_flux_function__batch(Func&& f)
+        {
+            cons_flux_function__batch          = f;
+            cons_flux_function__interval_batch = f;
+        }
+
+        //--------------------------------------------------//
+        // Conversion from conservative to non-conservative //
+        //--------------------------------------------------//
 
         /**
          * @returns the non-conservative flux function that calls the conservative one.
