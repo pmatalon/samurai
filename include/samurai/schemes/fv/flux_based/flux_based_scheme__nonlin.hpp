@@ -58,6 +58,7 @@ namespace samurai
 
         FluxDefinition<cfg> m_flux_definition;
         BatchMemory m_batch_memory;
+        BatchMemory m_batch_memory__views;
 
         bool m_include_boundary_fluxes = true;
         bool m_enable_batches          = true;
@@ -185,11 +186,11 @@ namespace samurai
                                                        double right_factor,
                                                        Func&& apply_contrib)
         {
-            auto& interface_batch       = m_batch_memory.interface_batch;
-            auto& comput_stencil_batch  = m_batch_memory.comput_stencil_batch;
-            auto& stencil_values__views = m_batch_memory.stencil_values__views;
-            auto& flux_values           = m_batch_memory.flux_values;
-            auto& batch_data            = m_batch_memory.batch_data;
+            auto& interface_batch       = m_batch_memory__views.interface_batch;
+            auto& comput_stencil_batch  = m_batch_memory__views.comput_stencil_batch;
+            auto& stencil_values__views = m_batch_memory__views.stencil_values__views;
+            auto& flux_values           = m_batch_memory__views.flux_values;
+            auto& batch_data            = m_batch_memory__views.batch_data;
 
             batch_data.batch_size = interface_batch.position();
             flux_values.resize(batch_data.batch_size);
@@ -231,66 +232,125 @@ namespace samurai
                     comput_stencil_it.move_next();
                 }
             }
-            else if constexpr (get_type == Get::Intervals)
+            else
             {
-                auto& interface_batch       = m_batch_memory.interface_batch;
-                auto& comput_stencil_batch  = m_batch_memory.comput_stencil_batch;
-                auto& stencil_values__views = m_batch_memory.stencil_values__views;
-
                 auto interval_size = comput_stencil_it.interval().size();
-                // times::timers_b.start("resize");
-                if (interval_size > interface_batch.capacity())
+
+                if (interval_size >= 500)
                 {
-                    m_batch_memory.resize(interval_size);
-                }
-                interface_batch.reset_position();
-                comput_stencil_batch.reset_position();
-                // times::timers_b.stop("resize");
+                    auto& interface_batch       = m_batch_memory__views.interface_batch;
+                    auto& comput_stencil_batch  = m_batch_memory__views.comput_stencil_batch;
+                    auto& stencil_values__views = m_batch_memory__views.stencil_values__views;
 
-                stencil_values__views.clear();
-
-                // Views to field values
-                auto interval_step = comput_stencil_it.interval().step;
-                // times::timers_b.start("Views");
-                for (std::size_t s = 0; s < cfg::stencil_size; ++s)
-                {
-                    auto start = comput_stencil_it.cells()[s].index;
-                    auto end   = start + static_cast<index_t>(interval_size);
-                    stencil_values__views.emplace_back(field(start, end, interval_step));
-                }
-                // times::timers_b.stop("Views");
-
-                copy_to_batch(interface_it, interval_size, interface_batch);
-                copy_to_batch(comput_stencil_it, interval_size, comput_stencil_batch);
-
-                call_flux_function__interval_batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
-            }
-            else if constexpr (get_type == Get::CellBatches)
-            {
-                auto& interface_batch      = m_batch_memory.interface_batch;
-                auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
-                auto& stencil_values       = m_batch_memory.stencil_values;
-
-                std::size_t to_process = comput_stencil_it.interval().size();
-                while (to_process > 0)
-                {
-                    auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
-
-                    // Copy field values
-                    // times::timers_b.start("Copies");
-                    copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
-                    // times::timers_b.stop("Copies");
-
-                    copy_to_batch(interface_it, n, interface_batch);
-                    copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
-
-                    to_process -= n;
-                    if (interface_batch.position() == interface_batch.capacity())
+                    if (interval_size > interface_batch.capacity())
                     {
-                        call_flux_function__batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+                        m_batch_memory__views.resize(interval_size);
+                    }
+                    stencil_values__views.clear();
+
+                    // Views to field values
+                    auto interval_step = comput_stencil_it.interval().step;
+                    // times::timers_b.start("Views");
+                    for (std::size_t s = 0; s < cfg::stencil_size; ++s)
+                    {
+                        auto start = comput_stencil_it.cells()[s].index;
+                        auto end   = start + static_cast<index_t>(interval_size);
+                        stencil_values__views.emplace_back(field(start, end, interval_step));
+                    }
+                    // times::timers_b.stop("Views");
+
+                    copy_to_batch(interface_it, interval_size, interface_batch);
+                    copy_to_batch(comput_stencil_it, interval_size, comput_stencil_batch);
+
+                    call_flux_function__interval_batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+                }
+                else
+                {
+                    auto& interface_batch      = m_batch_memory.interface_batch;
+                    auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
+                    auto& stencil_values       = m_batch_memory.stencil_values;
+
+                    std::size_t to_process = interval_size;
+                    while (to_process > 0)
+                    {
+                        auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
+
+                        // Copy field values
+                        // times::timers_b.start("Copies");
+                        copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
+                        // times::timers_b.stop("Copies");
+
+                        copy_to_batch(interface_it, n, interface_batch);
+                        copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
+
+                        to_process -= n;
+                        if (interface_batch.position() == interface_batch.capacity())
+                        {
+                            call_flux_function__batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+                        }
                     }
                 }
             }
+            // else if constexpr (get_type == Get::Intervals)
+            // {
+            //     auto& interface_batch       = m_batch_memory.interface_batch;
+            //     auto& comput_stencil_batch  = m_batch_memory.comput_stencil_batch;
+            //     auto& stencil_values__views = m_batch_memory.stencil_values__views;
+
+            //     auto interval_size = comput_stencil_it.interval().size();
+            //     // times::timers_b.start("resize");
+            //     if (interval_size > interface_batch.capacity())
+            //     {
+            //         m_batch_memory.resize(interval_size);
+            //     }
+            //     // interface_batch.reset_position();
+            //     // comput_stencil_batch.reset_position();
+            //     // times::timers_b.stop("resize");
+
+            //     stencil_values__views.clear();
+
+            //     // Views to field values
+            //     auto interval_step = comput_stencil_it.interval().step;
+            //     // times::timers_b.start("Views");
+            //     for (std::size_t s = 0; s < cfg::stencil_size; ++s)
+            //     {
+            //         auto start = comput_stencil_it.cells()[s].index;
+            //         auto end   = start + static_cast<index_t>(interval_size);
+            //         stencil_values__views.emplace_back(field(start, end, interval_step));
+            //     }
+            //     // times::timers_b.stop("Views");
+
+            //     copy_to_batch(interface_it, interval_size, interface_batch);
+            //     copy_to_batch(comput_stencil_it, interval_size, comput_stencil_batch);
+
+            //     call_flux_function__interval_batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+            // }
+            // else if constexpr (get_type == Get::CellBatches)
+            // {
+            //     auto& interface_batch      = m_batch_memory.interface_batch;
+            //     auto& comput_stencil_batch = m_batch_memory.comput_stencil_batch;
+            //     auto& stencil_values       = m_batch_memory.stencil_values;
+
+            //     std::size_t to_process = comput_stencil_it.interval().size();
+            //     while (to_process > 0)
+            //     {
+            //         auto n = std::min(to_process, interface_batch.capacity() - interface_batch.position());
+
+            //         // Copy field values
+            //         // times::timers_b.start("Copies");
+            //         copy_values_to_batch(comput_stencil_it, n, stencil_values, field);
+            //         // times::timers_b.stop("Copies");
+
+            //         copy_to_batch(interface_it, n, interface_batch);
+            //         copy_to_batch(comput_stencil_it, n, comput_stencil_batch);
+
+            //         to_process -= n;
+            //         if (interface_batch.position() == interface_batch.capacity())
+            //         {
+            //             call_flux_function__batch(flux_def, left_factor, right_factor, std::forward<Func>(apply_contrib));
+            //         }
+            //     }
+            // }
         }
 
       public:
@@ -316,6 +376,7 @@ namespace samurai
             if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
             {
                 m_batch_memory.resize(args::batch_size);
+                m_batch_memory__views.resize(args::batch_size);
                 if (flux_def.create_temp_variables)
                 {
                     batch_data.temp_variables = flux_def.create_temp_variables();
@@ -347,7 +408,7 @@ namespace samurai
                                                                                           std::forward<Func>(apply_contrib));
                                                                                   });
 
-                if constexpr (get_type == Get::CellBatches)
+                if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
                 {
                     if (interface_batch.position() > 0)
                     {
@@ -388,7 +449,7 @@ namespace samurai
                                                                   right_factor,
                                                                   std::forward<Func>(apply_contrib));
                         });
-                    if constexpr (get_type == Get::CellBatches)
+                    if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
                     {
                         if (interface_batch.position() > 0)
                         {
@@ -420,7 +481,7 @@ namespace samurai
                                                                   right_factor,
                                                                   std::forward<Func>(apply_contrib));
                         });
-                    if constexpr (get_type == Get::CellBatches)
+                    if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
                     {
                         if (interface_batch.position() > 0)
                         {
