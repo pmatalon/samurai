@@ -52,6 +52,13 @@ namespace samurai
                 stencil_values__views.reserve(cfg::stencil_size);
                 flux_values.resize(size);
             }
+
+            void reset()
+            {
+                interface_batch.reset_position();
+                comput_stencil_batch.reset_position();
+                stencil_values.reset_position();
+            }
         };
 
       private:
@@ -153,9 +160,7 @@ namespace samurai
             flux_values *= -1. / left_factor * right_factor; // add minus sign, cancel left factor and apply right one
             apply_contrib(interface_batch[1], flux_values);
 
-            stencil_values.reset_position();
-            interface_batch.reset_position();
-            comput_stencil_batch.reset_position();
+            m_batch_memory.reset();
         }
 
         template <class Func>
@@ -175,9 +180,7 @@ namespace samurai
             flux_values *= factor;
             apply_contrib(interface_batch[0], flux_values);
 
-            stencil_values.reset_position();
-            interface_batch.reset_position();
-            comput_stencil_batch.reset_position();
+            m_batch_memory.reset();
         }
 
         template <class Func>
@@ -204,8 +207,7 @@ namespace samurai
             flux_values *= -1. / left_factor * right_factor; // add minus sign, cancel left factor and apply right one
             apply_contrib(interface_batch[1], flux_values);
 
-            interface_batch.reset_position();
-            comput_stencil_batch.reset_position();
+            m_batch_memory__views.reset();
         }
 
         template <Get get_type = Get::Cells, class InterfaceIterator, class StencilIterator, class FluxFunction, class Func>
@@ -236,7 +238,7 @@ namespace samurai
             {
                 auto interval_size = comput_stencil_it.interval().size();
 
-                if (interval_size >= 500)
+                if (interval_size >= 16)
                 {
                     auto& interface_batch       = m_batch_memory__views.interface_batch;
                     auto& comput_stencil_batch  = m_batch_memory__views.comput_stencil_batch;
