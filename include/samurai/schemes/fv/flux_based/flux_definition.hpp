@@ -68,11 +68,17 @@ namespace samurai
     template <class cfg>
     using StencilValuesBatch = ArrayBatch<typename cfg::input_field_t::value_type, cfg::stencil_size>;
 
+    template <class cfg>
     struct BatchData
     {
+        using cell_t = typename cfg::input_field_t::cell_t;
+
         std::size_t batch_size;
         double cell_length;
         void* temp_variables;
+
+        ArrayBatch<cell_t, 2> interfaces;
+        ArrayBatch<cell_t, cfg::stencil_size> comput_stencils;
     };
 
     /**
@@ -111,10 +117,10 @@ namespace samurai
         using cons_jacobian_func = std::function<StencilJacobian<cfg>(stencil_cells_t&, const field_t&)>;     // conservative
 
         // ------ Fluxes computed by batches
-        using cons_flux_func__batch = std::function<
-            void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
-        using cons_flux_func__interval_batch = std::function<
-            void(const BatchData&, const stencil_cells_batch_t&, flux_values_batch_t&, const stencil_values_interval_batch_t&)>; // conservative
+        using cons_flux_func__batch_copies_func = std::function<
+            void(const BatchData<cfg>&, flux_values_batch_t&, const stencil_values_batch_t&)>; // conservative
+        using cons_flux_func__batch_views_func = std::function<
+            void(const BatchData<cfg>&, flux_values_batch_t&, const stencil_values_interval_batch_t&)>; // conservative
         using create_temp_variables_func = std::function<temp_variables_t()>;
 
         //-----------------------//
@@ -141,15 +147,15 @@ namespace samurai
 
         // ------ Fluxes computed by batches
 
-        cons_flux_func__batch cons_flux_function__batch                   = nullptr;
-        cons_flux_func__interval_batch cons_flux_function__interval_batch = nullptr;
-        create_temp_variables_func create_temp_variables                  = nullptr;
+        cons_flux_func__batch_copies_func cons_flux_function__batch_copies = nullptr;
+        cons_flux_func__batch_views_func cons_flux_function__batch_views   = nullptr;
+        create_temp_variables_func create_temp_variables                   = nullptr;
 
         template <class Func>
         void set_cons_flux_function__batch(Func&& f)
         {
-            cons_flux_function__batch          = f;
-            cons_flux_function__interval_batch = f;
+            cons_flux_function__batch_copies = f;
+            cons_flux_function__batch_views  = f;
         }
 
         //--------------------------------------------------//

@@ -92,11 +92,11 @@ namespace samurai
 
         void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) override
         {
-            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__interval_batch)
+            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_views)
             {
                 _apply<Get::Intervals>(d, output_field, input_field);
             }
-            else if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch)
+            else if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_copies)
             {
                 _apply<Get::CellBatches>(d, output_field, input_field);
             }

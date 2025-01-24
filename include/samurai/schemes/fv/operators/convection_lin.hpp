@@ -157,11 +157,7 @@ namespace samurai
                     };
 
                     weno5[d].set_cons_flux_function__batch(
-                        [&velocity](const BatchData& batch_data,
-                                    const auto& /*cells*/,
-                                    Batch<FluxValue<cfg>>& flux_values,
-                                    auto& stencil_values) // const StencilValuesBatch<cfg>&
-                                                          // stencil_values)
+                        [&velocity](const BatchData<cfg>& batch_data, Batch<FluxValue<cfg>>& flux_values, const auto& stencil_values)
                         {
                             // TempVariables* tmp = static_cast<TempVariables*>(ctx);
                             // tmp->resize(stencil_values.size());
@@ -244,7 +240,7 @@ namespace samurai
                     };
 
                     weno5[d].set_cons_flux_function__batch(
-                        [&velocity](const BatchData& batch_data, const auto& /*cells*/, Batch<FluxValue<cfg>>& flux_values, auto& stencil_values)
+                        [&velocity](const BatchData<cfg>& batch_data, Batch<FluxValue<cfg>>& flux_values, const auto& stencil_values)
                         {
                 // TempVariables* tmp = static_cast<TempVariables*>(ctx);
                 // tmp->resize(stencil_values.size());
