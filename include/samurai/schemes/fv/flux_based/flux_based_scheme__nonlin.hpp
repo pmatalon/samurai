@@ -309,6 +309,89 @@ namespace samurai
             }
         }
 
+        template <bool enable_batches, bool direction, class InterfaceIterator, class StencilIterator, class FluxFunction, class Func>
+        void process_boundary_interfaces(InterfaceIterator& interface_it,
+                                         StencilIterator& comput_stencil_it,
+                                         const NormalFluxDefinition<cfg>& flux_def,
+                                         FluxFunction& flux_function,
+                                         input_field_t& field,
+                                         double factor,
+                                         Func&& apply_contrib)
+        {
+            if constexpr (!enable_batches)
+            {
+                for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
+                {
+                    auto flux_values = flux_function(comput_stencil_it.cells(), field);
+                    if constexpr (direction)
+                    {
+                        flux_values[0] *= factor;
+                        apply_contrib(interface_it.cells()[0], flux_values[0]);
+                    }
+                    else // opposite direction
+                    {
+                        flux_values[1] *= -factor;
+                        apply_contrib(interface_it.cells()[0], flux_values[1]);
+                    }
+
+                    interface_it.move_next();
+                    comput_stencil_it.move_next();
+                }
+            }
+            else
+            {
+                auto interval_size = comput_stencil_it.interval().size();
+
+                if (interval_size >= args::batch_min_size)
+                {
+                    auto& b = m_batch_by_views;
+
+                    if (interval_size > b.capacity())
+                    {
+                        b.resize(interval_size);
+                    }
+
+                    // Views to field values
+                    auto interval_step = comput_stencil_it.interval().step;
+                    // times::timers_b.start("Views");
+                    for (std::size_t s = 0; s < cfg::stencil_size; ++s)
+                    {
+                        auto start = comput_stencil_it.cells()[s].index;
+                        auto end   = start + static_cast<index_t>(interval_size);
+                        b.stencil_values.emplace_back(field(start, end, interval_step));
+                    }
+                    // times::timers_b.stop("Views");
+
+                    copy_to_batch(interface_it, interval_size, b.data.interfaces);
+                    copy_to_batch(comput_stencil_it, interval_size, b.data.comput_stencils);
+
+                    call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
+                }
+                else
+                {
+                    auto& b = m_batch_by_copies;
+
+                    std::size_t to_process = comput_stencil_it.interval().size();
+                    while (to_process > 0)
+                    {
+                        auto n = std::min(to_process, b.remaining_size());
+
+                        // Copy field values
+                        copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
+
+                        copy_to_batch(interface_it, n, b.data.interfaces);
+                        copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
+
+                        to_process -= n;
+                        if (b.is_full())
+                        {
+                            call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
+                        }
+                    }
+                }
+            }
+        }
+
       public:
 
         /**
@@ -484,78 +567,22 @@ namespace samurai
                 auto factor = h_factor(h, h);
 
                 // Boundary in direction
-                for_each_boundary_interface__direction<run_type, Get::Intervals>(
-                    mesh,
-                    level,
-                    flux_def.direction,
-                    flux_def.stencil,
-                    [&](auto& interface_it, auto& comput_stencil_it)
-                    {
-                        if constexpr (!enable_batches)
-                        {
-                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                            {
-                                auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                flux_values[0] *= factor;
-                                apply_contrib(interface_it.cells()[0], flux_values[0]);
-
-                                interface_it.move_next();
-                                comput_stencil_it.move_next();
-                            }
-                        }
-                        else
-                        {
-                            auto interval_size = comput_stencil_it.interval().size();
-
-                            if (interval_size >= args::batch_min_size)
-                            {
-                                auto& b = m_batch_by_views;
-
-                                if (interval_size > b.capacity())
-                                {
-                                    b.resize(interval_size);
-                                }
-
-                                // Views to field values
-                                auto interval_step = comput_stencil_it.interval().step;
-                                // times::timers_b.start("Views");
-                                for (std::size_t s = 0; s < cfg::stencil_size; ++s)
-                                {
-                                    auto start = comput_stencil_it.cells()[s].index;
-                                    auto end   = start + static_cast<index_t>(interval_size);
-                                    b.stencil_values.emplace_back(field(start, end, interval_step));
-                                }
-                                // times::timers_b.stop("Views");
-
-                                copy_to_batch(interface_it, interval_size, b.data.interfaces);
-                                copy_to_batch(comput_stencil_it, interval_size, b.data.comput_stencils);
-
-                                call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
-                            }
-                            else
-                            {
-                                auto& b = m_batch_by_copies;
-
-                                std::size_t to_process = comput_stencil_it.interval().size();
-                                while (to_process > 0)
-                                {
-                                    auto n = std::min(to_process, b.remaining_size());
-
-                                    // Copy field values
-                                    copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
-
-                                    copy_to_batch(interface_it, n, b.data.interfaces);
-                                    copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
-
-                                    to_process -= n;
-                                    if (b.is_full())
-                                    {
-                                        call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
-                                    }
-                                }
-                            }
-                        }
-                    });
+                for_each_boundary_interface__direction<run_type, Get::Intervals>(mesh,
+                                                                                 level,
+                                                                                 flux_def.direction,
+                                                                                 flux_def.stencil,
+                                                                                 [&](auto& interface_it, auto& comput_stencil_it)
+                                                                                 {
+                                                                                     static constexpr bool direction = true;
+                                                                                     process_boundary_interfaces<enable_batches, direction>(
+                                                                                         interface_it,
+                                                                                         comput_stencil_it,
+                                                                                         flux_def,
+                                                                                         flux_function,
+                                                                                         field,
+                                                                                         factor,
+                                                                                         std::forward<Func>(apply_contrib));
+                                                                                 });
 
                 if constexpr (enable_batches)
                 {
@@ -573,70 +600,14 @@ namespace samurai
                     flux_def.stencil,
                     [&](auto& interface_it, auto& comput_stencil_it)
                     {
-                        if constexpr (!enable_batches)
-                        {
-                            for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
-                            {
-                                auto flux_values = flux_function(comput_stencil_it.cells(), field);
-                                flux_values[1] *= factor;
-                                apply_contrib(interface_it.cells()[0], flux_values[1]);
-
-                                interface_it.move_next();
-                                comput_stencil_it.move_next();
-                            }
-                        }
-                        else
-                        {
-                            auto interval_size = comput_stencil_it.interval().size();
-
-                            if (interval_size >= args::batch_min_size)
-                            {
-                                auto& b = m_batch_by_views;
-
-                                if (interval_size > b.capacity())
-                                {
-                                    b.resize(interval_size);
-                                }
-
-                                // Views to field values
-                                auto interval_step = comput_stencil_it.interval().step;
-                                // times::timers_b.start("Views");
-                                for (std::size_t s = 0; s < cfg::stencil_size; ++s)
-                                {
-                                    auto start = comput_stencil_it.cells()[s].index;
-                                    auto end   = start + static_cast<index_t>(interval_size);
-                                    b.stencil_values.emplace_back(field(start, end, interval_step));
-                                }
-                                // times::timers_b.stop("Views");
-
-                                copy_to_batch(interface_it, interval_size, b.data.interfaces);
-                                copy_to_batch(comput_stencil_it, interval_size, b.data.comput_stencils);
-
-                                call_flux_function_boundary__batch(b, flux_def, -factor, std::forward<Func>(apply_contrib));
-                            }
-                            else
-                            {
-                                auto& b = m_batch_by_copies;
-
-                                std::size_t to_process = comput_stencil_it.interval().size();
-                                while (to_process > 0)
-                                {
-                                    auto n = std::min(to_process, b.remaining_size());
-
-                                    // Copy field values
-                                    copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
-
-                                    copy_to_batch(interface_it, n, b.data.interfaces);
-                                    copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
-
-                                    to_process -= n;
-                                    if (b.is_full())
-                                    {
-                                        call_flux_function_boundary__batch(b, flux_def, -factor, std::forward<Func>(apply_contrib));
-                                    }
-                                }
-                            }
-                        }
+                        static constexpr bool direction = false; // opposite direction
+                        process_boundary_interfaces<enable_batches, direction>(interface_it,
+                                                                               comput_stencil_it,
+                                                                               flux_def,
+                                                                               flux_function,
+                                                                               field,
+                                                                               -factor,
+                                                                               std::forward<Func>(apply_contrib));
                     });
 
                 if constexpr (enable_batches)
