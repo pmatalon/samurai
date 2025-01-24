@@ -67,6 +67,10 @@ namespace samurai
                 {
                     stencil_values.reset_position();
                 }
+                else
+                {
+                    stencil_values.clear();
+                }
             }
 
             inline auto capacity()
@@ -253,7 +257,7 @@ namespace samurai
             {
                 auto interval_size = comput_stencil_it.interval().size();
 
-                if (interval_size >= 16)
+                if (interval_size >= args::batch_min_size)
                 {
                     auto& b = m_batch_by_views;
 
@@ -261,7 +265,6 @@ namespace samurai
                     {
                         b.resize(interval_size);
                     }
-                    b.stencil_values.clear();
 
                     // Views to field values
                     auto interval_step = comput_stencil_it.interval().step;
@@ -502,23 +505,53 @@ namespace samurai
                         }
                         else
                         {
-                            auto& b = m_batch_by_copies;
+                            auto interval_size = comput_stencil_it.interval().size();
 
-                            std::size_t to_process = comput_stencil_it.interval().size();
-                            while (to_process > 0)
+                            if (interval_size >= args::batch_min_size)
                             {
-                                auto n = std::min(to_process, b.remaining_size());
+                                auto& b = m_batch_by_views;
 
-                                // Copy field values
-                                copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
-
-                                copy_to_batch(interface_it, n, b.data.interfaces);
-                                copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
-
-                                to_process -= n;
-                                if (b.is_full())
+                                if (interval_size > b.capacity())
                                 {
-                                    call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
+                                    b.resize(interval_size);
+                                }
+
+                                // Views to field values
+                                auto interval_step = comput_stencil_it.interval().step;
+                                // times::timers_b.start("Views");
+                                for (std::size_t s = 0; s < cfg::stencil_size; ++s)
+                                {
+                                    auto start = comput_stencil_it.cells()[s].index;
+                                    auto end   = start + static_cast<index_t>(interval_size);
+                                    b.stencil_values.emplace_back(field(start, end, interval_step));
+                                }
+                                // times::timers_b.stop("Views");
+
+                                copy_to_batch(interface_it, interval_size, b.data.interfaces);
+                                copy_to_batch(comput_stencil_it, interval_size, b.data.comput_stencils);
+
+                                call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
+                            }
+                            else
+                            {
+                                auto& b = m_batch_by_copies;
+
+                                std::size_t to_process = comput_stencil_it.interval().size();
+                                while (to_process > 0)
+                                {
+                                    auto n = std::min(to_process, b.remaining_size());
+
+                                    // Copy field values
+                                    copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
+
+                                    copy_to_batch(interface_it, n, b.data.interfaces);
+                                    copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
+
+                                    to_process -= n;
+                                    if (b.is_full())
+                                    {
+                                        call_flux_function_boundary__batch(b, flux_def, factor, std::forward<Func>(apply_contrib));
+                                    }
                                 }
                             }
                         }
@@ -554,23 +587,53 @@ namespace samurai
                         }
                         else
                         {
-                            auto& b = m_batch_by_copies;
+                            auto interval_size = comput_stencil_it.interval().size();
 
-                            std::size_t to_process = comput_stencil_it.interval().size();
-                            while (to_process > 0)
+                            if (interval_size >= args::batch_min_size)
                             {
-                                auto n = std::min(to_process, b.remaining_size());
+                                auto& b = m_batch_by_views;
 
-                                // Copy field values
-                                copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
-
-                                copy_to_batch(interface_it, n, b.data.interfaces);
-                                copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
-
-                                to_process -= n;
-                                if (b.is_full())
+                                if (interval_size > b.capacity())
                                 {
-                                    call_flux_function_boundary__batch(b, flux_def, -factor, std::forward<Func>(apply_contrib));
+                                    b.resize(interval_size);
+                                }
+
+                                // Views to field values
+                                auto interval_step = comput_stencil_it.interval().step;
+                                // times::timers_b.start("Views");
+                                for (std::size_t s = 0; s < cfg::stencil_size; ++s)
+                                {
+                                    auto start = comput_stencil_it.cells()[s].index;
+                                    auto end   = start + static_cast<index_t>(interval_size);
+                                    b.stencil_values.emplace_back(field(start, end, interval_step));
+                                }
+                                // times::timers_b.stop("Views");
+
+                                copy_to_batch(interface_it, interval_size, b.data.interfaces);
+                                copy_to_batch(comput_stencil_it, interval_size, b.data.comput_stencils);
+
+                                call_flux_function_boundary__batch(b, flux_def, -factor, std::forward<Func>(apply_contrib));
+                            }
+                            else
+                            {
+                                auto& b = m_batch_by_copies;
+
+                                std::size_t to_process = comput_stencil_it.interval().size();
+                                while (to_process > 0)
+                                {
+                                    auto n = std::min(to_process, b.remaining_size());
+
+                                    // Copy field values
+                                    copy_values_to_batch(comput_stencil_it, n, b.stencil_values, field);
+
+                                    copy_to_batch(interface_it, n, b.data.interfaces);
+                                    copy_to_batch(comput_stencil_it, n, b.data.comput_stencils);
+
+                                    to_process -= n;
+                                    if (b.is_full())
+                                    {
+                                        call_flux_function_boundary__batch(b, flux_def, -factor, std::forward<Func>(apply_contrib));
+                                    }
                                 }
                             }
                         }
