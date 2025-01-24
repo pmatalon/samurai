@@ -66,7 +66,7 @@ namespace samurai
     using StencilJacobianPair = StdArrayWrapper<StencilJacobian<cfg>, 2>;
 
     template <class cfg>
-    using StencilValuesBatch = ArrayBatch<typename cfg::input_field_t::value_type, cfg::stencil_size>;
+    using StencilValuesBatch = ArrayBatch<typename cfg::input_field_t::local_data_type, cfg::stencil_size>;
 
     template <class cfg>
     struct BatchData
