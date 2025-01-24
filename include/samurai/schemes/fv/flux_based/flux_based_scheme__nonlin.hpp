@@ -221,7 +221,7 @@ namespace samurai
             b.reset();
         }
 
-        template <Get get_type = Get::Cells, class InterfaceIterator, class StencilIterator, class FluxFunction, class Func>
+        template <bool enable_batches, class InterfaceIterator, class StencilIterator, class FluxFunction, class Func>
         void process_interior_interfaces(InterfaceIterator& interface_it,
                                          StencilIterator& comput_stencil_it,
                                          const NormalFluxDefinition<cfg>& flux_def,
@@ -231,7 +231,7 @@ namespace samurai
                                          double right_factor,
                                          Func&& apply_contrib)
         {
-            if constexpr (get_type == Get::Cells)
+            if constexpr (!enable_batches)
             {
                 for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                 {
@@ -368,7 +368,7 @@ namespace samurai
          * This function is used in the Explicit class to iterate over the interior interfaces
          * in a specific direction and receive the contribution computed from the stencil.
          */
-        template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Func>
+        template <Run run_type = Run::Sequential, bool enable_batches, class Func>
         void for_each_interior_interface(std::size_t d, input_field_t& field, Func&& apply_contrib)
         {
             auto& mesh = field.mesh();
@@ -380,7 +380,7 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
-            if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+            if constexpr (enable_batches)
             {
                 m_batch_by_copies.resize(args::batch_size);
                 m_batch_by_views.resize(args::batch_size);
@@ -405,7 +405,7 @@ namespace samurai
                                                                                   flux_def.stencil,
                                                                                   [&](auto& interface_it, auto& comput_stencil_it)
                                                                                   {
-                                                                                      process_interior_interfaces<get_type>(
+                                                                                      process_interior_interfaces<enable_batches>(
                                                                                           interface_it,
                                                                                           comput_stencil_it,
                                                                                           flux_def,
@@ -416,7 +416,7 @@ namespace samurai
                                                                                           std::forward<Func>(apply_contrib));
                                                                                   });
 
-                if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+                if constexpr (enable_batches)
                 {
                     if (!m_batch_by_copies.is_empty())
                     {
@@ -449,16 +449,16 @@ namespace samurai
                         flux_def.stencil,
                         [&](auto& interface_it, auto& comput_stencil_it)
                         {
-                            process_interior_interfaces<get_type>(interface_it,
-                                                                  comput_stencil_it,
-                                                                  flux_def,
-                                                                  flux_function,
-                                                                  field,
-                                                                  left_factor,
-                                                                  right_factor,
-                                                                  std::forward<Func>(apply_contrib));
+                            process_interior_interfaces<enable_batches>(interface_it,
+                                                                        comput_stencil_it,
+                                                                        flux_def,
+                                                                        flux_function,
+                                                                        field,
+                                                                        left_factor,
+                                                                        right_factor,
+                                                                        std::forward<Func>(apply_contrib));
                         });
-                    if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+                    if constexpr (enable_batches)
                     {
                         if (!m_batch_by_copies.is_empty())
                         {
@@ -481,16 +481,16 @@ namespace samurai
                         flux_def.stencil,
                         [&](auto& interface_it, auto& comput_stencil_it)
                         {
-                            process_interior_interfaces<get_type>(interface_it,
-                                                                  comput_stencil_it,
-                                                                  flux_def,
-                                                                  flux_function,
-                                                                  field,
-                                                                  left_factor,
-                                                                  right_factor,
-                                                                  std::forward<Func>(apply_contrib));
+                            process_interior_interfaces<enable_batches>(interface_it,
+                                                                        comput_stencil_it,
+                                                                        flux_def,
+                                                                        flux_function,
+                                                                        field,
+                                                                        left_factor,
+                                                                        right_factor,
+                                                                        std::forward<Func>(apply_contrib));
                         });
-                    if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+                    if constexpr (enable_batches)
                     {
                         if (!m_batch_by_copies.is_empty())
                         {
@@ -505,7 +505,7 @@ namespace samurai
          * This function is used in the Explicit class to iterate over the boundary interfaces
          * in a specific direction and receive the contribution computed from the stencil.
          */
-        template <Run run_type = Run::Sequential, Get get_type = Get::Cells, class Func>
+        template <Run run_type = Run::Sequential, bool enable_batches, class Func>
         void for_each_boundary_interface(std::size_t d, input_field_t& field, Func&& apply_contrib)
         {
             auto& mesh = field.mesh();
@@ -517,7 +517,7 @@ namespace samurai
 
             auto flux_function = flux_def.flux_function ? flux_def.flux_function : flux_def.flux_function_as_conservative();
 
-            if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+            if constexpr (enable_batches)
             {
                 m_batch_by_copies.resize(args::batch_size);
                 m_batch_by_views.resize(args::batch_size);
@@ -544,7 +544,7 @@ namespace samurai
                     flux_def.stencil,
                     [&](auto& interface_it, auto& comput_stencil_it)
                     {
-                        if constexpr (get_type == Get::Cells)
+                        if constexpr (!enable_batches)
                         {
                             for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                             {
@@ -556,7 +556,7 @@ namespace samurai
                                 comput_stencil_it.move_next();
                             }
                         }
-                        else if constexpr (get_type == Get::CellBatches)
+                        else
                         {
                             auto& b = m_batch_by_copies;
 
@@ -580,7 +580,7 @@ namespace samurai
                         }
                     });
 
-                if constexpr (get_type == Get::CellBatches)
+                if constexpr (enable_batches)
                 {
                     if (!m_batch_by_copies.is_empty())
                     {
@@ -596,7 +596,7 @@ namespace samurai
                     flux_def.stencil,
                     [&](auto& interface_it, auto& comput_stencil_it)
                     {
-                        if constexpr (get_type == Get::Cells)
+                        if constexpr (!enable_batches)
                         {
                             for (std::size_t ii = 0; ii < comput_stencil_it.interval().size(); ++ii)
                             {
@@ -608,7 +608,7 @@ namespace samurai
                                 comput_stencil_it.move_next();
                             }
                         }
-                        else if constexpr (get_type == Get::CellBatches)
+                        else
                         {
                             auto& b = m_batch_by_copies;
 
@@ -632,7 +632,7 @@ namespace samurai
                         }
                     });
 
-                if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+                if constexpr (enable_batches)
                 {
                     if (!m_batch_by_copies.is_empty())
                     {

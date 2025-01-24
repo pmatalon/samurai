@@ -30,10 +30,10 @@ namespace samurai
         {
         }
 
-        template <Get get_type, class CellType, class ContribType>
+        template <bool enable_batches, class CellType, class ContribType>
         inline void add_cell_contrib_to_field(output_field_t& output_field, const CellType& cell, const ContribType& contrib) const
         {
-            if constexpr (get_type == Get::Cells)
+            if constexpr (!enable_batches)
             {
                 for (size_type field_i = 0; field_i < output_field_size; ++field_i)
                 {
@@ -41,7 +41,7 @@ namespace samurai
                     field_value(output_field, cell, field_i) += this->scheme().flux_value_cmpnent(contrib, field_i);
                 }
             }
-            else if constexpr (get_type == Get::CellBatches || get_type == Get::Intervals)
+            else
             {
                 for (std::size_t i = 0; i < contrib.size(); ++i)
                 {
@@ -56,18 +56,18 @@ namespace samurai
 
       private:
 
-        template <Get get_type = Get::Cells>
+        template <bool enable_batches>
         void _apply(std::size_t d, output_field_t& output_field, input_field_t& input_field)
         {
             times::timers_interfaces.start("interior");
 
             // Interior interfaces
-            scheme().template for_each_interior_interface<Run::Parallel, get_type>( // We need the 'template' keyword...
+            scheme().template for_each_interior_interface<Run::Parallel, enable_batches>( // We need the 'template' keyword...
                 d,
                 input_field,
                 [&](const auto& cell, const auto& contrib)
                 {
-                    add_cell_contrib_to_field<get_type>(output_field, cell, contrib);
+                    add_cell_contrib_to_field<enable_batches>(output_field, cell, contrib);
                 });
 
             times::timers_interfaces.stop("interior");
@@ -77,12 +77,12 @@ namespace samurai
             // Boundary interfaces
             if (scheme().include_boundary_fluxes())
             {
-                scheme().template for_each_boundary_interface<Run::Parallel, get_type>( // We need the 'template' keyword...
+                scheme().template for_each_boundary_interface<Run::Parallel, enable_batches>( // We need the 'template' keyword...
                     d,
                     input_field,
                     [&](const auto& cell, const auto& contrib)
                     {
-                        add_cell_contrib_to_field<get_type>(output_field, cell, contrib);
+                        add_cell_contrib_to_field<enable_batches>(output_field, cell, contrib);
                     });
             }
             times::timers_interfaces.stop("boundary");
@@ -92,17 +92,13 @@ namespace samurai
 
         void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) override
         {
-            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_views)
+            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_copies)
             {
-                _apply<Get::Intervals>(d, output_field, input_field);
-            }
-            else if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_copies)
-            {
-                _apply<Get::CellBatches>(d, output_field, input_field);
+                _apply<true>(d, output_field, input_field);
             }
             else
             {
-                _apply<Get::Cells>(d, output_field, input_field);
+                _apply<false>(d, output_field, input_field);
             }
         }
     };
