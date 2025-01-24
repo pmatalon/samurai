@@ -220,6 +220,7 @@ namespace samurai
             static constexpr std::size_t dim = mesh_t::dim;
             using interval_t                 = typename mesh_t::interval_t;
             using index_t                    = typename interval_t::index_t;
+            using interval_value_t           = typename interval_t::value_t;
             using cell_t                     = Cell<dim, interval_t>;
             using data_type                  = field_data_storage_t<value_t, size, SOA>;
             using local_data_type            = local_field_data_t<value_t, size, SOA>;
@@ -268,6 +269,11 @@ namespace samurai
                 }
 #endif
                 return data;
+            }
+
+            inline auto operator()(index_t start, index_t end, interval_value_t step)
+            {
+                return view(m_storage, {start, end, step});
             }
 
             template <class... T>

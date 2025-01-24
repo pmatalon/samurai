@@ -226,8 +226,6 @@ namespace samurai
                               ArrayBatch<T, stencil_size>& stencil_values_batch,
                               const Field& field)
     {
-        static_assert(Field::size == 1);
-
         auto start = stencil_values_batch.position();
         assert(start + length <= stencil_values_batch.capacity());
         for (std::size_t s = 0; s < stencil_size; ++s)

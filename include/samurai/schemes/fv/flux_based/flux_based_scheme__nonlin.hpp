@@ -37,7 +37,7 @@ namespace samurai
         {
             // Input
             BatchData<cfg> data;
-            ArrayBatch<typename input_field_t::value_type, cfg::stencil_size> stencil_values;
+            StencilValuesBatch<cfg> stencil_values;
             std::vector<field_data_view_t> stencil_values__views;
             // Output
             Batch<FluxValue<cfg>> flux_values;
