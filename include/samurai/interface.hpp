@@ -1,5 +1,4 @@
 #pragma once
-#include "arguments.hpp"
 #include "boundary.hpp"
 #include "stencil.hpp"
 
@@ -11,10 +10,8 @@ namespace samurai
                                   stencil_iterator_t& comput_stencil_it,
                                   Func&& f)
     {
-        // times::timers_b.start("iterator interval init");
         comput_stencil_it.init(mesh_interval);
         interface_it.init(mesh_interval);
-        // times::timers_b.stop("iterator interval init");
 
         if constexpr (get_type == Get::Intervals)
         {
