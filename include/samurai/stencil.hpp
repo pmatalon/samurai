@@ -499,9 +499,6 @@ namespace samurai
         const StencilAnalyzer<stencil_size, dim>& m_stencil_analyzer;
         std::array<cell_t, stencil_size> m_cells;
 
-        std::array<cell_t, stencil_size> m_cells;
-        std::array<mesh_interval_t, stencil_size> m_mesh_intervals;
-
       public:
 
         IteratorStencil(const Mesh& mesh, const StencilAnalyzer<stencil_size, dim>& stencil_analyzer)
@@ -528,14 +525,8 @@ namespace samurai
                     cell.level  = origin_mesh_interval.level;
                     cell.length = length;
                 }
-                for (mesh_interval_t& mi : m_mesh_intervals)
-                {
-                    mi = origin_mesh_interval.level;
-                }
             }
             m_mesh_interval = &origin_mesh_interval;
-
-            m_mesh_interval = &mesh_interval;
 
             // origin of the stencil
             cell_t& origin_cell    = m_cells[m_stencil_analyzer.origin_index];
@@ -562,238 +553,220 @@ namespace samurai
                     }
 
                     // Translate the coordinates according the direction d
-                    cell_t& cell = m_cells[id];
+                    cell_t& cell = m_cells[i];
                     for (unsigned int k = 0; k < dim; ++k)
                     {
-                        cell.indices[k] = origin_cell.indices[k] + d[k];
+                        cell.indices[k] = origin_cell.indices[k] + m_stencil_analyzer.stencil(i, k);
                     }
 
-                    // We are on the same row as the stencil origin if d = {d[0], 0,..., 0}
-                    bool same_row = true;
-                    for (std::size_t k = 1; k < dim; ++k)
-                    {
-                        if (d[k] != 0)
-                        {
-                            same_row = false;
-                            break;
-                        }
-                    }
-                    if (same_row) // same row as the stencil origin
+                    // Find cell index
+                    if (m_stencil_analyzer.same_row_as_origin[i])
                     {
                         // translation on the row
-                        cell.index = origin_cell.index + d[0];
+                        cell.index = origin_cell.index + m_stencil_analyzer.stencil(i, 0);
                     }
                     else
                     {
-                        cell.index = get_index_start_translated(m_mesh, mesh_interval, d);
-#ifndef NDEBUG
-                        if (cell.index > 0 && static_cast<std::size_t>(cell.index) > m_mesh.nb_cells())
+                        DirectionVector<dim> dir;
+                        for (std::size_t k = 0; k < dim; ++k)
                         {
-                            std::cout << "Non-existing neighbour for " << origin_cell << " in the direction " << d << std::endl;
+                            dir(k) = m_stencil_analyzer.stencil(i, k);
+                        }
+                        cell.index = get_index_start_translated(m_mesh, origin_mesh_interval, dir);
+#ifndef NDEBUG
+                        if (cell.index > 0 && static_cast<std::size_t>(cell.index) > m_mesh.nb_cells()) // nb_cells() is very costly
+                        {
+                            std::cout << "Non-existing neighbour for " << origin_cell << " in the direction " << dir << std::endl;
                             assert(false);
                         }
 #endif
                     }
                 }
-
-                mesh_interval_t& mi = m_mesh_intervals[i];
-                mi.i += m_stencil(i, 0);
-                for (unsigned int k = 1; k < dim; ++k)
-                {
-                    mi.index[k] += m_stencil(i, k);
-                }
-            }
-
-            inline const auto& mesh() const
-            {
-                return m_mesh;
-            }
-
-            inline auto& mesh_interval() const
-            {
-                return *m_mesh_interval;
-            }
-
-            inline auto& interval() const
-            {
-                return m_mesh_interval->i;
-            }
-
-            inline auto& level() const
-            {
-                return m_mesh_interval->level;
-            }
-
-            inline void move_next()
-            {
-                for (cell_t& cell : m_cells)
-                {
-                    cell.index++;      // increment cell index
-                    cell.indices[0]++; // increment x-coordinate
-                }
-            }
-
-            inline const auto& cells() const
-            {
-                return m_cells;
-            }
-
-            inline auto& cells()
-            {
-                return m_cells;
-            }
-
-            inline void move_next()
-            {
-                for (cell_t& cell : m_cells)
-                {
-                    ++cell.index;      // increment cell index
-                    ++cell.indices[0]; // increment x-coordinate
-                }
-            }
-        };
-
-        template <std::size_t index_coarse_cell, class Mesh, std::size_t stencil_size>
-        class LevelJumpIterator
-        {
-          public:
-
-            static constexpr std::size_t dim = Mesh::dim;
-            using cell_t                     = Cell<dim, typename Mesh::interval_t>;
-            using mesh_interval_t            = typename Mesh::mesh_interval_t;
-
-            static constexpr std::size_t coarse = index_coarse_cell;
-            static constexpr std::size_t fine   = (index_coarse_cell + 1) % 2;
-
-          private:
-
-            std::size_t m_direction_index;
-            IteratorStencil<Mesh, 1> m_coarse_it;
-            const IteratorStencil<Mesh, stencil_size>* m_fine_it = nullptr;
-            std::array<cell_t, 2> m_cells;
-            bool m_move_coarse_cell = false;
-
-          public:
-
-            LevelJumpIterator(const IteratorStencil<Mesh, stencil_size>& fine_it, std::size_t direction_index)
-                : m_direction_index(direction_index)
-                , m_coarse_it(fine_it.mesh(), center_only_stencil_analyzer<dim>)
-                , m_fine_it(&fine_it)
-            {
-            }
-
-            void init(const mesh_interval_t& fine_mesh_interval)
-            {
-                mesh_interval_t coarse_mesh_interval(fine_mesh_interval.level - 1, fine_mesh_interval.i >> 1, fine_mesh_interval.index >> 1);
-
-                m_coarse_it.init(coarse_mesh_interval);
-
-                m_cells[coarse] = m_coarse_it.cells()[0];
-                m_cells[fine]   = m_fine_it->cells()[m_direction_index];
-
-                m_move_coarse_cell = false;
-            }
-
-            inline auto& interval() const
-            {
-                return m_fine_it->interval();
-            }
-
-            inline const auto& cells() const
-            {
-                return m_cells;
-            }
-
-            inline void move_next()
-            {
-                // Move fine cell
-                ++m_cells[fine].index;      // increment cell index
-                ++m_cells[fine].indices[0]; // increment x-coordinate
-
-                // Move coarse cell only once every two iterations
-                m_cells[coarse].index += (m_ii % 2 == 1) ? 1 : 0;
-                m_cells[coarse].indices[0] += (m_ii % 2 == 1) ? 1 : 0;
-                m_ii++;
-            }
-
-            inline const auto& cells() const
-            {
-                return m_cells;
-            }
-        };
-
-        template <class Mesh, std::size_t stencil_size>
-        auto make_stencil_iterator(const Mesh& mesh, const StencilAnalyzer<stencil_size, Mesh::dim>& stencil)
-        {
-            return IteratorStencil<Mesh, stencil_size>(mesh, stencil);
-        }
-
-        template <class iterator_stencil, class Func>
-        inline void for_each_stencil_sliding_in_interval(const typename iterator_stencil::mesh_interval_t& mesh_interval,
-                                                         iterator_stencil& stencil_it,
-                                                         Func&& f)
-        {
-            stencil_it.init(mesh_interval);
-            for (std::size_t ii = 0; ii < mesh_interval.i.size(); ++ii)
-            {
-                f(stencil_it.cells());
-                stencil_it.move_next();
             }
         }
 
-        template <class Mesh, std::size_t stencil_size, class Func>
-        inline void for_each_stencil_sliding_in_interval(const Mesh& mesh,
-                                                         const typename Mesh::mesh_interval_t& mesh_interval,
-                                                         const StencilAnalyzer<stencil_size, Mesh::dim>& stencil,
-                                                         Func&& f)
+        inline const auto& mesh() const
         {
-            auto stencil_it = make_stencil_iterator(mesh, stencil);
-            for_each_stencil_sliding_in_interval(mesh_interval, stencil_it, std::forward<Func>(f));
+            return m_mesh;
         }
 
-        template <class Mesh, std::size_t stencil_size, class Func>
-        inline void for_each_stencil(const Mesh& mesh, std::size_t level, IteratorStencil<Mesh, stencil_size>& stencil_it, Func&& f)
+        inline auto& mesh_interval() const
         {
-            using mesh_id_t = typename Mesh::mesh_id_t;
-            for_each_meshinterval(mesh[mesh_id_t::cells][level],
-                                  [&](auto mesh_interval)
-                                  {
-                                      for_each_stencil_sliding_in_interval(mesh_interval, stencil_it, std::forward<Func>(f));
-                                  });
+            return *m_mesh_interval;
         }
 
-        template <class Mesh, std::size_t stencil_size, class Func>
-        inline void for_each_stencil(const Mesh& mesh, const StencilAnalyzer<stencil_size, Mesh::dim>& stencil, Func&& f)
+        inline auto& interval() const
         {
-            auto stencil_it = make_stencil_iterator(mesh, stencil);
-            for_each_level(mesh,
-                           [&](std::size_t level)
-                           {
-                               for_each_stencil(mesh, level, stencil_it, std::forward<Func>(f));
-                           });
+            return m_mesh_interval->i;
         }
 
-        template <class Set, class Mesh, std::size_t stencil_size, class Func>
-        inline void for_each_stencil(Set& set, IteratorStencil<Mesh, stencil_size>& stencil_it, Func&& f)
+        inline auto& level() const
         {
-            using mesh_interval_t = typename IteratorStencil<Mesh, stencil_size>::mesh_interval_t;
-            for_each_meshinterval<mesh_interval_t>(set,
-                                                   [&](auto mesh_interval)
-                                                   {
-                                                       for_each_stencil_sliding_in_interval(mesh_interval, stencil_it, std::forward<Func>(f));
-                                                   });
+            return m_mesh_interval->level;
         }
 
-        template <class Mesh, class Set, std::size_t stencil_size, class Func>
-        inline void for_each_stencil(const Mesh& mesh, Set& set, const StencilAnalyzer<stencil_size, Mesh::dim>& stencil, Func&& f)
+        inline const auto& stencil() const
         {
-            auto stencil_it = make_stencil_iterator(mesh, stencil);
-            for_each_stencil(set, stencil_it, std::forward<Func>(f));
+            return m_stencil_analyzer.stencil;
         }
 
-        template <std::size_t index_coarse_cell, class Mesh, std::size_t stencil_size>
-        auto make_leveljump_iterator(const IteratorStencil<Mesh, stencil_size>& fine_iterator, std::size_t direction_index)
+        inline const auto& cells() const
         {
-            return LevelJumpIterator<index_coarse_cell, Mesh, stencil_size>(fine_iterator, direction_index);
+            return m_cells;
+        }
+
+        inline auto& cells()
+        {
+            return m_cells;
+        }
+
+        inline void move_next()
+        {
+            for (cell_t& cell : m_cells)
+            {
+                ++cell.index;      // increment cell index
+                ++cell.indices[0]; // increment x-coordinate
+            }
+        }
+    };
+
+    template <std::size_t index_coarse_cell, class Mesh, std::size_t stencil_size>
+    class LevelJumpIterator
+    {
+      public:
+
+        static constexpr std::size_t dim = Mesh::dim;
+        using cell_t                     = Cell<dim, typename Mesh::interval_t>;
+        using mesh_interval_t            = typename Mesh::mesh_interval_t;
+
+        static constexpr std::size_t coarse = index_coarse_cell;
+        static constexpr std::size_t fine   = (index_coarse_cell + 1) % 2;
+
+      private:
+
+        std::size_t m_direction_index;
+
+        IteratorStencil<Mesh, 1> m_coarse_it;
+        const IteratorStencil<Mesh, stencil_size>* m_fine_it = nullptr;
+        std::array<cell_t, 2> m_cells;
+        bool m_move_coarse_cell = false;
+
+      public:
+
+        LevelJumpIterator(const IteratorStencil<Mesh, stencil_size>& fine_it, std::size_t direction_index)
+            : m_direction_index(direction_index)
+            , m_coarse_it(fine_it.mesh(), center_only_stencil_analyzer<dim>)
+            , m_fine_it(&fine_it)
+        {
+        }
+
+        void init(const mesh_interval_t& fine_mesh_interval)
+        {
+            mesh_interval_t coarse_mesh_interval(fine_mesh_interval.level - 1, fine_mesh_interval.i >> 1, fine_mesh_interval.index >> 1);
+
+            m_coarse_it.init(coarse_mesh_interval);
+
+            m_cells[coarse] = m_coarse_it.cells()[0];
+            m_cells[fine]   = m_fine_it->cells()[m_direction_index];
+
+            m_move_coarse_cell = false;
+        }
+
+        inline auto& interval() const
+        {
+            return m_fine_it->interval();
+        }
+
+        inline const auto& cells() const
+        {
+            return m_cells;
+        }
+
+        inline void move_next()
+        {
+            // Move fine cell
+            ++m_cells[fine].index;      // increment cell index
+            ++m_cells[fine].indices[0]; // increment x-coordinate
+
+            // Move coarse cell only once every two iterations
+            m_cells[coarse].index += static_cast<std::size_t>(m_move_coarse_cell);
+            m_cells[coarse].indices[0] += static_cast<std::size_t>(m_move_coarse_cell);
+            m_move_coarse_cell = !m_move_coarse_cell;
+        }
+    };
+
+    template <class Mesh, std::size_t stencil_size>
+    auto make_stencil_iterator(const Mesh& mesh, const StencilAnalyzer<stencil_size, Mesh::dim>& stencil)
+    {
+        return IteratorStencil<Mesh, stencil_size>(mesh, stencil);
+    }
+
+    template <class iterator_stencil, class Func>
+    inline void for_each_stencil_sliding_in_interval(const typename iterator_stencil::mesh_interval_t& mesh_interval,
+                                                     iterator_stencil& stencil_it,
+                                                     Func&& f)
+    {
+        stencil_it.init(mesh_interval);
+        for (std::size_t ii = 0; ii < mesh_interval.i.size(); ++ii)
+        {
+            f(stencil_it.cells());
+            stencil_it.move_next();
         }
     }
+
+    template <class Mesh, std::size_t stencil_size, class Func>
+    inline void for_each_stencil_sliding_in_interval(const Mesh& mesh,
+                                                     const typename Mesh::mesh_interval_t& mesh_interval,
+                                                     const StencilAnalyzer<stencil_size, Mesh::dim>& stencil,
+                                                     Func&& f)
+    {
+        auto stencil_it = make_stencil_iterator(mesh, stencil);
+        for_each_stencil_sliding_in_interval(mesh_interval, stencil_it, std::forward<Func>(f));
+    }
+
+    template <class Mesh, std::size_t stencil_size, class Func>
+    inline void for_each_stencil(const Mesh& mesh, std::size_t level, IteratorStencil<Mesh, stencil_size>& stencil_it, Func&& f)
+    {
+        using mesh_id_t = typename Mesh::mesh_id_t;
+        for_each_meshinterval(mesh[mesh_id_t::cells][level],
+                              [&](auto mesh_interval)
+                              {
+                                  for_each_stencil_sliding_in_interval(mesh_interval, stencil_it, std::forward<Func>(f));
+                              });
+    }
+
+    template <class Mesh, std::size_t stencil_size, class Func>
+    inline void for_each_stencil(const Mesh& mesh, const StencilAnalyzer<stencil_size, Mesh::dim>& stencil, Func&& f)
+    {
+        auto stencil_it = make_stencil_iterator(mesh, stencil);
+        for_each_level(mesh,
+                       [&](std::size_t level)
+                       {
+                           for_each_stencil(mesh, level, stencil_it, std::forward<Func>(f));
+                       });
+    }
+
+    template <class Set, class Mesh, std::size_t stencil_size, class Func>
+    inline void for_each_stencil(Set& set, IteratorStencil<Mesh, stencil_size>& stencil_it, Func&& f)
+    {
+        using mesh_interval_t = typename IteratorStencil<Mesh, stencil_size>::mesh_interval_t;
+        for_each_meshinterval<mesh_interval_t>(set,
+                                               [&](auto mesh_interval)
+                                               {
+                                                   for_each_stencil_sliding_in_interval(mesh_interval, stencil_it, std::forward<Func>(f));
+                                               });
+    }
+
+    template <class Mesh, class Set, std::size_t stencil_size, class Func>
+    inline void for_each_stencil(const Mesh& mesh, Set& set, const StencilAnalyzer<stencil_size, Mesh::dim>& stencil, Func&& f)
+    {
+        auto stencil_it = make_stencil_iterator(mesh, stencil);
+        for_each_stencil(set, stencil_it, std::forward<Func>(f));
+    }
+
+    template <std::size_t index_coarse_cell, class Mesh, std::size_t stencil_size>
+    auto make_leveljump_iterator(const IteratorStencil<Mesh, stencil_size>& fine_iterator, std::size_t direction_index)
+    {
+        return LevelJumpIterator<index_coarse_cell, Mesh, stencil_size>(fine_iterator, direction_index);
+    }
+}
