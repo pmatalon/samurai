@@ -257,7 +257,7 @@ namespace samurai
             {
                 auto interval_size = comput_stencil_it.interval().size();
 
-                if (interval_size >= args::batch_min_size)
+                if (interval_size >= args::batch_view_min_size)
                 {
                     auto& b = m_batch_by_views;
 
@@ -342,7 +342,7 @@ namespace samurai
             {
                 auto interval_size = comput_stencil_it.interval().size();
 
-                if (interval_size >= args::batch_min_size)
+                if (interval_size >= args::batch_view_min_size)
                 {
                     auto& b = m_batch_by_views;
 
@@ -371,7 +371,7 @@ namespace samurai
                 {
                     auto& b = m_batch_by_copies;
 
-                    std::size_t to_process = comput_stencil_it.interval().size();
+                    std::size_t to_process = interval_size;
                     while (to_process > 0)
                     {
                         auto n = std::min(to_process, b.remaining_size());

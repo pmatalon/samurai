@@ -92,7 +92,7 @@ namespace samurai
 
         void apply(std::size_t d, output_field_t& output_field, input_field_t& input_field) override
         {
-            if (scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_copies)
+            if (!args::disable_batch && scheme().enable_batches() && scheme().flux_definition()[d].cons_flux_function__batch_copies)
             {
                 _apply<true>(d, output_field, input_field);
             }
