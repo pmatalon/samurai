@@ -56,6 +56,9 @@ target_link_libraries(finite-volume-scalar-burgers-2d samurai CLI11::CLI11)
 add_executable(finite-volume-linear-convection linear_convection.cpp)
 target_link_libraries(finite-volume-linear-convection samurai CLI11::CLI11)
 
+add_executable(finite-volume-linear-convection-obstacle linear_convection_obstacle.cpp)
+target_link_libraries(finite-volume-linear-convection-obstacle samurai CLI11::CLI11)
+
 add_executable(finite-volume-burgers burgers.cpp)
 target_link_libraries(finite-volume-burgers samurai CLI11::CLI11)
 
