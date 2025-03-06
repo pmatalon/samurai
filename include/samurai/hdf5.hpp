@@ -399,6 +399,10 @@ namespace samurai
             {
                 min_level--;
             }
+            if (min_level > 0)
+            {
+                min_level--;
+            }
 
             for (std::size_t level = min_level; level <= max_level; ++level)
             {
